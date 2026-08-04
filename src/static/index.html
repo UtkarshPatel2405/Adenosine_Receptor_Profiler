@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adenosine Receptor Selectivity Predictor — Conformal ML Platform</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=4.0">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://3dmol.org/build/3Dmol-min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- Luminescent background orbs -->
+    <div class="bg-orbs">
+        <div class="bg-orb bg-orb-1"></div>
+        <div class="bg-orb bg-orb-2"></div>
+        <div class="bg-orb bg-orb-3"></div>
+    </div>
+
+    <!-- Neural network SVG paths -->
+    <svg class="neural-paths" viewBox="0 0 1400 900" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <path class="neural-line neural-line-1" d="M0,200 C300,180 400,350 700,300 S1100,150 1400,220" stroke="url(#nGrad1)" stroke-width="1" fill="none"/>
+        <path class="neural-line neural-line-2" d="M0,500 C250,480 500,600 750,520 S1050,400 1400,480" stroke="url(#nGrad2)" stroke-width="1" fill="none"/>
+        <path class="neural-line neural-line-3" d="M0,750 C350,720 600,850 850,780 S1200,680 1400,740" stroke="url(#nGrad3)" stroke-width="1" fill="none"/>
+        <defs>
+            <linearGradient id="nGrad1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="rgba(56,189,248,0)"/><stop offset="50%" stop-color="rgba(56,189,248,0.15)"/><stop offset="100%" stop-color="rgba(167,139,250,0)"/></linearGradient>
+            <linearGradient id="nGrad2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="rgba(74,222,128,0)"/><stop offset="50%" stop-color="rgba(74,222,128,0.12)"/><stop offset="100%" stop-color="rgba(56,189,248,0)"/></linearGradient>
+            <linearGradient id="nGrad3" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="rgba(167,139,250,0)"/><stop offset="50%" stop-color="rgba(167,139,250,0.10)"/><stop offset="100%" stop-color="rgba(74,222,128,0)"/></linearGradient>
+        </defs>
+        <!-- Glow pulses traveling along paths -->
+        <circle class="neural-pulse neural-pulse-1" r="3" fill="#38bdf8" opacity="0.6"><animateMotion dur="8s" repeatCount="indefinite" path="M0,200 C300,180 400,350 700,300 S1100,150 1400,220"/></circle>
+        <circle class="neural-pulse neural-pulse-2" r="2.5" fill="#4ade80" opacity="0.5"><animateMotion dur="10s" repeatCount="indefinite" path="M0,500 C250,480 500,600 750,520 S1050,400 1400,480"/></circle>
+        <circle class="neural-pulse neural-pulse-3" r="2" fill="#a78bfa" opacity="0.4"><animateMotion dur="12s" repeatCount="indefinite" path="M0,750 C350,720 600,850 850,780 S1200,680 1400,740"/></circle>
+    </svg>
+
+    <div class="app-container">
+        <!-- Header & Nav -->
+        <header class="navbar anim-in">
+            <div class="brand">
+                <i class="motion-icon icon-spin icon-glow" data-lucide="dna"
+                    style="width:28px;height:28px;color:#38bdf8"></i>
+                <div>
+                    <h1>Adenosine Selectivity Platform</h1>
+                    <p>Conformal Multi-Model ML · GPCR Profiling across A<sub>1</sub>, A<sub>2A</sub>, A<sub>2B</sub>,
+                        A<sub>3</sub></p>
+                </div>
+            </div>
+            <nav class="nav-tabs">
+                <button class="nav-tab active" data-tab="single-tab"><i class="tab-ico" data-lucide="atom"></i>Single
+                    Molecule</button>
+                <button class="nav-tab" data-tab="batch-tab"><i class="tab-ico" data-lucide="file-stack"></i>Batch
+                    CSV</button>
+                <button class="nav-tab" data-tab="results-tab"><i class="tab-ico" data-lucide="network"></i>Model
+                    Results Hub</button>
+            </nav>
+        </header>
+
+        <!-- Hero Banner -->
+        <div class="hero-banner reveal" id="hero-banner">
+            <div class="hero-inner">
+                <div class="hero-text">
+                    <span class="hero-badge"><i data-lucide="shield-check" style="width:13px;height:13px"></i>Conformal ML</span>
+                    <h2 class="hero-title">Predict Adenosine Receptor<br>Selectivity with Confidence</h2>
+                    <p class="hero-sub">Multi-model ensemble (XGBoost, LightGBM, RandomForest, Stacking) trained on 33,401 pChEMBL records with MAPIE 90% conformal prediction intervals across A<sub>1</sub>, A<sub>2A</sub>, A<sub>2B</sub>, A<sub>3</sub>.</p>
+                    <div class="hero-stats">
+                        <div class="hero-stat">
+                            <span class="hero-stat-num" data-count="4">0</span>
+                            <span class="hero-stat-label">Receptor Subtypes</span>
+                        </div>
+                        <div class="hero-stat">
+                            <span class="hero-stat-num" data-count="33401">0</span>
+                            <span class="hero-stat-label">Training Records</span>
+                        </div>
+                        <div class="hero-stat">
+                            <span class="hero-stat-num" data-count="4">0</span>
+                            <span class="hero-stat-label">ML Models</span>
+                        </div>
+                        <div class="hero-stat">
+                            <span class="hero-stat-num" data-count="90">0</span>
+                            <span class="hero-stat-label">% Conformal CI</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <div class="hero-molecule-ring">
+                        <svg class="hero-ring-svg" viewBox="0 0 260 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="130" cy="130" r="118" stroke="url(#heroGrad)" stroke-width="1.5" opacity="0.5"/>
+                            <circle cx="130" cy="130" r="95" stroke="url(#heroGrad2)" stroke-width="1" opacity="0.35"/>
+                            <circle cx="130" cy="130" r="72" stroke="rgba(56,189,248,0.15)" stroke-width="1" stroke-dasharray="6 8"/>
+                            <defs>
+                                <linearGradient id="heroGrad" x1="0" y1="0" x2="260" y2="260"><stop offset="0%" stop-color="#38bdf8"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient>
+                                <linearGradient id="heroGrad2" x1="260" y1="0" x2="0" y2="260"><stop offset="0%" stop-color="#4ade80"/><stop offset="100%" stop-color="#38bdf8"/></linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="hero-molecule-icon">
+                            <i data-lucide="dna" style="width:52px;height:52px;color:#38bdf8"></i>
+                        </div>
+                        <div class="hero-orbit-dot hero-orbit-1"></div>
+                        <div class="hero-orbit-dot hero-orbit-2"></div>
+                        <div class="hero-orbit-dot hero-orbit-3"></div>
+                        <div class="hero-orbit-dot hero-orbit-4"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SINGLE PREDICT TAB -->
+        <main id="single-tab" class="tab-content active">
+            <div class="card anim-in reveal" style="transition-delay:0.05s">
+                <div class="section-header"><i class="tab-ico" data-lucide="flask-conical"></i>Structure Input (SMILES
+                    or PDB ID)</div>
+                <div class="input-group">
+                    <input type="text" id="smiles-input" class="input-field"
+                        placeholder="Enter SMILES or 4-character PDB ID (e.g., C1=NC2=C(C(=N1)N)N=CN2[C@@H]3...)"
+                        value="C1=NC2=C(C(=N1)N)N=CN2[C@@H]3[C@@H]([C@@H]([C@H](O3)CO)O)O">
+                    <button id="predict-btn" class="btn btn-spark"><i class="tab-ico" data-lucide="sparkles"></i>Run
+                        Prediction</button>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-top:0.15rem">
+                    <span style="font-size:0.75rem;color:var(--text-muted)">Quick Examples:</span>
+                    <button class="btn example-btn"
+                        data-smiles="C1=NC2=C(C(=N1)N)N=CN2[C@@H]3[C@@H]([C@@H]([C@H](O3)CO)O)O"
+                        style="padding:0.2rem 0.6rem;font-size:0.72rem">Adenosine</button>
+                    <button class="btn example-btn" data-smiles="CN1C=NC2=C1C(=O)N(C(=O)N2C)C"
+                        style="padding:0.2rem 0.6rem;font-size:0.72rem">Caffeine</button>
+                    <button class="btn example-btn" data-smiles="CN1C2=C(C(=O)N(C1=O)C)NC=N2"
+                        style="padding:0.2rem 0.6rem;font-size:0.72rem">Theophylline</button>
+                    <button class="btn example-btn" data-smiles="CN1C(=O)N(C)C2=C(N1)N(C)C(=O)N2CC3=CC=C(C=C3)OC"
+                        style="padding:0.2rem 0.6rem;font-size:0.72rem">Istradefylline</button>
+                </div>
+            </div>
+
+            <div id="single-results" style="display:none"></div>
+        </main>
+
+        <!-- BATCH PREDICT TAB -->
+        <main id="batch-tab" class="tab-content">
+            <div class="card anim-in reveal" style="transition-delay:0.05s">
+                <div class="section-header"><i class="tab-ico" data-lucide="file-spreadsheet"></i>Batch Screening & CSV
+                    Processing</div>
+                <input type="file" id="batch-file-input" accept=".csv,.txt" style="display:none">
+                <div id="batch-dropzone" class="dropzone">
+                    <svg class="dropzone-rail" viewBox="0 0 200 120" preserveAspectRatio="none" fill="none"
+                        aria-hidden="true">
+                        <rect class="rail" x="3" y="3" width="194" height="114" rx="14" stroke="#38bdf8"
+                            stroke-width="2" stroke-dasharray="10 7" />
+                    </svg>
+                    <i class="motion-icon icon-float icon-morph" data-lucide="upload-cloud"
+                        style="width:36px;height:36px;color:#38bdf8"></i>
+                    <h3 style="margin-top:0.6rem">Drag & Drop your SMILES CSV file here</h3>
+                    <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.3rem">Supports .csv files with a
+                        SMILES column. Automatic Applicability Domain (AD) screening.</p>
+                </div>
+            </div>
+            <div id="batch-results"></div>
+        </main>
+
+        <!-- MODEL RESULTS HUB (7 SUB-TABS) -->
+        <main id="results-tab" class="tab-content">
+            <div class="card anim-in reveal" style="transition-delay:0.05s">
+                <div class="nav-tabs" style="margin-bottom:1.0rem">
+                    <button class="sub-tab nav-tab active" data-subtab="sub-metrics"><i class="tab-ico" data-lucide="target"></i>Metrics</button>
+                    <button class="sub-tab nav-tab" data-subtab="sub-shap"><i class="tab-ico" data-lucide="bar-chart-3"></i>SHAP / Y-Rand</button>
+                    <button class="sub-tab nav-tab" data-subtab="sub-diag"><i class="tab-ico" data-lucide="activity"></i>Diagnostics</button>
+                    <button class="sub-tab nav-tab" data-subtab="sub-examples"><i class="tab-ico" data-lucide="scan-search"></i>Examples</button>
+                    <button class="sub-tab nav-tab" data-subtab="sub-ext"><i class="tab-ico" data-lucide="book-open-check"></i>External</button>
+                    <button class="sub-tab nav-tab" data-subtab="sub-raw"><i class="tab-ico" data-lucide="database"></i>Raw Data</button>
+                    <button class="sub-tab nav-tab" data-subtab="sub-meth"><i class="tab-ico" data-lucide="git-compare-arrows"></i>Methodology</button>
+                </div>
+
+                <!-- SUB 1: METRICS & CALIBRATION -->
+                <div id="sub-metrics" class="sub-content active">
+                    <div class="sci-box" style="margin-bottom:0.8rem"><b style="color:var(--ink)">Model Performance Metrics.</b> All metrics on the scaffold-split test set (20%, no scaffold overlap with training). <b>MAE:</b> avg |pred − exp| in pChEMBL (assay noise ±0.3–0.5). <b>R²:</b> variance explained (1 = perfect, 0 = mean). <b>Conformal Coverage:</b> fraction of true values within 90% predicted intervals (target ≥0.85).</div>
+                    <div class="grid-4" id="overall-metrics-grid"></div>
+                    <div class="grid-2" style="margin-top:1rem">
+                        <div class="card reveal" style="transition-delay:0.1s">
+                            <div class="section-header"><i class="tab-ico" data-lucide="gauge"></i>MAE by Uncertainty Quartile</div>
+                            <div style="height:260px"><canvas id="calibration-chart"></canvas></div>
+                            <div style="font-size:0.65rem;color:var(--text-muted);margin-top:0.4rem"><b>Q1</b> = lowest predicted σ → should have lowest MAE. <b>Q4</b> = highest σ → highest MAE. Flat = uncertainty uninformative.</div>
+                        </div>
+                        <div class="card reveal" style="transition-delay:0.15s">
+                            <div class="section-header"><i class="tab-ico" data-lucide="image"></i>Calibration Curve</div>
+                            <div id="calibration-plot-wrap" style="min-height:200px;display:flex;align-items:center;justify-content:center">
+                                <img id="calibration-plot-img" style="max-width:100%;max-height:280px;border-radius:8px;display:none" alt="Calibration plot">
+                                <span id="calibration-plot-placeholder" style="font-size:0.75rem;color:var(--text-muted)">Loading…</span>
+                            </div>
+                            <div style="font-size:0.65rem;color:var(--text-muted);margin-top:0.4rem"><b>X</b> = predicted confidence. <b>Y</b> = observed coverage. On diagonal = perfectly calibrated. Above = conservative, below = overconfident.</div>
+                        </div>
+                    </div>
+                    <div class="card reveal" style="margin-top:1rem;transition-delay:0.2s">
+                        <div class="section-header"><i class="tab-ico" data-lucide="layout-grid"></i>Per-Subtype Metrics</div>
+                        <div class="table-wrap">
+                            <table><thead><tr><th>Subtype</th><th>R²</th><th>MAE</th><th>Test N</th></tr></thead><tbody id="per-subtype-metrics-body"></tbody></table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB 2: SHAP & Y-RANDOMIZATION -->
+                <div id="sub-shap" class="sub-content">
+                    <div class="sci-box" style="margin-bottom:0.8rem"><b style="color:var(--ink)">SHAP</b> = Shapley Additive exPlanations (game-theoretic feature importance). <b>Y-Randomization</b> = shuffle pChEMBL targets, retrain 20×, verify real R² ≫ null distribution (true SAR signal, not noise).</div>
+                    <div class="grid-2">
+                        <div class="card">
+                            <div class="section-header"><i class="tab-ico" data-lucide="bar-chart-3"></i>Global SHAP Feature Importance</div>
+                            <div style="height:260px"><canvas id="shap-global-chart"></canvas></div>
+                        </div>
+                        <div class="card">
+                            <div class="section-header"><i class="tab-ico" data-lucide="shuffle"></i>Y-Randomization (Overall)</div>
+                            <div id="yrand-body"></div>
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.6rem;margin:1rem 0 0.6rem">
+                        <div class="section-header" style="margin:0"><i class="tab-ico" data-lucide="filter"></i>Per-Subtype SHAP & Y-Rand</div>
+                        <select id="shap-subtype-select" class="input-field" style="width:auto;padding:0.3rem 0.6rem;font-size:0.75rem">
+                            <option value="A1">A₁</option><option value="A2A">A₂ₐ</option><option value="A2B">A₂B</option><option value="A3">A₃</option>
+                        </select>
+                    </div>
+                    <div class="grid-2">
+                        <div class="card">
+                            <div class="section-header"><i class="tab-ico" data-lucide="bar-chart"></i>SHAP Bar Plot — <span id="shap-subtype-label">A₁</span></div>
+                            <div style="min-height:180px;display:flex;align-items:center;justify-content:center">
+                                <img id="shap-bar-img" style="max-width:100%;max-height:300px;border-radius:8px;display:none" alt="SHAP bar">
+                                <span id="shap-bar-placeholder" style="font-size:0.75rem;color:var(--text-muted)">Select subtype…</span>
+                            </div>
+                            <div id="shap-top-features" style="margin-top:0.5rem"></div>
+                        </div>
+                        <div class="card">
+                            <div class="section-header"><i class="tab-ico" data-lucide="scatter-chart"></i>SHAP Beeswarm — <span id="shap-bee-label">A₁</span></div>
+                            <div style="min-height:180px;display:flex;align-items:center;justify-content:center">
+                                <img id="shap-bee-img" style="max-width:100%;max-height:300px;border-radius:8px;display:none" alt="SHAP beeswarm">
+                                <span id="shap-bee-placeholder" style="font-size:0.75rem;color:var(--text-muted)">Select subtype…</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid-2" style="margin-top:1rem">
+                        <div class="card">
+                            <div class="section-header"><i class="tab-ico" data-lucide="bar-chart-3"></i>Y-Rand Distribution — <span id="yrand-subtype-label">A₁</span></div>
+                            <div style="min-height:180px;display:flex;align-items:center;justify-content:center">
+                                <img id="yrand-dist-img" style="max-width:100%;max-height:260px;border-radius:8px;display:none" alt="Y-rand distribution">
+                                <span id="yrand-dist-placeholder" style="font-size:0.75rem;color:var(--text-muted)">Select subtype…</span>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="section-header"><i class="tab-ico" data-lucide="shield-check"></i>Y-Rand Metrics — <span id="yrand-metric-label">A₁</span></div>
+                            <div id="yrand-metrics-body"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB 3: DIAGNOSTICS -->
+                <div id="sub-diag" class="sub-content">
+                    <div class="sci-box" style="margin-bottom:0.8rem"><b style="color:var(--ink)">Dataset Diagnostics.</b> Scaffold diversity (Bemis-Murcko), pChEMBL distributions, and activity cliffs (Tanimoto ≥0.8, ΔpChEMBL ≥1.0). High cliffs = sharp SAR, harder to model.</div>
+                    <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.8rem">
+                        <div class="section-header" style="margin:0"><i class="tab-ico" data-lucide="target"></i>Target</div>
+                        <select id="diag-target-select" class="input-field" style="width:auto;padding:0.3rem 0.6rem;font-size:0.75rem">
+                            <option value="Combined">Combined (All)</option><option value="A1">A₁</option><option value="A2A">A₂ₐ</option><option value="A2B">A₂B</option><option value="A3">A₃</option>
+                        </select>
+                    </div>
+                    <div class="grid-4" id="diag-metrics-grid"></div>
+                    <div class="grid-2" style="margin-top:1rem">
+                        <div class="card">
+                            <div class="section-header"><i class="tab-ico" data-lucide="bar-chart-2"></i>pChEMBL Distribution</div>
+                            <div style="min-height:180px;display:flex;align-items:center;justify-content:center">
+                                <img id="diag-pchembl-img" style="max-width:100%;max-height:260px;border-radius:8px;display:none" alt="pChEMBL distribution">
+                                <span id="diag-pchembl-placeholder" style="font-size:0.75rem;color:var(--text-muted)">Select target…</span>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="section-header"><i class="tab-ico" data-lucide="git-compare-arrows"></i>Activity Cliff Shifts</div>
+                            <div style="min-height:180px;display:flex;align-items:center;justify-content:center">
+                                <img id="diag-cliffs-img" style="max-width:100%;max-height:260px;border-radius:8px;display:none" alt="Activity cliff shifts">
+                                <span id="diag-cliffs-placeholder" style="font-size:0.75rem;color:var(--text-muted)">Select target…</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB 4: EXAMPLE PREDICTIONS -->
+                <div id="sub-examples" class="sub-content">
+                    <div class="sci-box" style="margin-bottom:0.8rem"><b style="color:var(--ink)">Example Predictions.</b> Molecules from the scaffold-split test set (never seen during training). <b>Source:</b> "database" = experimental value returned; "model" = ML prediction. <b>AD:</b> Max Tanimoto to training set (≥0.6 = High, 0.4–0.6 = Med, &lt;0.4 = Low).</div>
+                    <div class="card" style="margin-bottom:1rem">
+                        <div class="section-header"><i class="tab-ico" data-lucide="list-checks"></i>Run Summary</div>
+                        <div class="table-wrap">
+                            <table><thead><tr><th>Mode</th><th>SMILES Count</th><th>Rows Clean</th><th>Timestamp</th></tr></thead><tbody id="run-summary-body"></tbody></table>
+                        </div>
+                    </div>
+                    <div class="card" style="margin-bottom:1rem">
+                        <div class="section-header"><i class="tab-ico" data-lucide="database"></i>Database Molecules (Experimental Values)</div>
+                        <div class="table-wrap">
+                            <table><thead><tr><th>SMILES</th><th>Source</th><th>Best</th><th>Predictions</th><th>AD</th><th>Hits</th></tr></thead><tbody id="db-examples-body"></tbody></table>
+                        </div>
+                    </div>
+                    <div class="card" style="margin-bottom:1rem">
+                        <div class="section-header"><i class="tab-ico" data-lucide="sparkles"></i>Novel Molecules (Model Predictions)</div>
+                        <div class="table-wrap">
+                            <table><thead><tr><th>SMILES</th><th>Source</th><th>Best</th><th>Predictions</th><th>AD</th><th>Hits</th></tr></thead><tbody id="novel-examples-body"></tbody></table>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="section-header"><i class="tab-ico" data-lucide="scan-search"></i>Molecule Gallery — Per-Compound Analysis</div>
+                        <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.7rem">Click <b style="color:#38bdf8">Full Analysis</b> to run the complete single-molecule pipeline for that SMILES.</p>
+                        <div class="grid-2" id="examples-cards"></div>
+                    </div>
+                    <div id="example-detail" class="card anim-in" style="display:none;margin-top:1rem"></div>
+                </div>
+
+                <!-- SUB 5: EXTERNAL VALIDATION -->
+                <div id="sub-ext" class="sub-content">
+                    <div class="sci-box" style="margin-bottom:0.8rem"><b style="color:var(--ink)">External Validation (Blind Test).</b> Molecules from recent literature <b>not</b> in ChEMBL/GPCRdb at training time. Stricter generalization test than scaffold split — evaluates real-world prospective performance.</div>
+                    <div class="card">
+                        <h3>Blind External Validation</h3>
+                        <div class="grid-4" id="external-summary"></div>
+                        <div class="section-header" style="margin-top:1rem"><i class="tab-ico" data-lucide="target"></i>Per-Subtype External Metrics</div>
+                        <div class="table-wrap">
+                            <table><thead><tr><th>Subtype</th><th>N</th><th>R²</th><th>MAE</th></tr></thead><tbody id="external-table-body"></tbody></table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB 6: RAW DATA -->
+                <div id="sub-raw" class="sub-content">
+                    <div class="card">
+                        <div class="section-header"><i class="tab-ico" data-lucide="file-down"></i>Raw Dataset Files</div>
+                        <div class="sci-box" style="font-size:0.75rem;margin-bottom:0.8rem"><b style="color:var(--ink)">Original Datasets.</b> Download the original experimental bioactivity datasets and query scripts. Only raw source data — processed feature matrices excluded.</div>
+                        <div class="grid-2" id="raw-files-grid"></div>
+                    </div>
+                    <div class="card" id="db-download-card" style="margin-top:1rem"></div>
+                </div>
+
+                <!-- SUB 7: METHODOLOGY -->
+                <div id="sub-meth" class="sub-content">
+                    <div class="card">
+                        <div class="section-header"><i class="tab-ico" data-lucide="book-open"></i>Pipeline Methodology</div>
+                        <div class="sci-box" style="margin-bottom:0.8rem"><b>Pipeline Overview.</b> 33,401 pChEMBL values across 4 adenosine receptor subtypes curated from ChEMBL. Morgan FP (2048) + MACCS (167) + 15 RDKit descriptors = 2,230 features. Scaffold split (Murcko, 80/20) ensures OOD generalization.</div>
+                        <div class="grid-3" id="method-cards">
+                            <div class="card" style="text-align:center;padding:0.8rem"><div class="section-header" style="font-size:0.75rem;justify-content:center;margin-bottom:0.3rem"><i class="tab-ico" data-lucide="library"></i>Data Curation</div><div style="font-size:0.7rem;color:var(--text-muted)">ChEMBL + Lit · 33K values · 4 subtypes</div></div>
+                            <div class="card" style="text-align:center;padding:0.8rem"><div class="section-header" style="font-size:0.75rem;justify-content:center;margin-bottom:0.3rem"><i class="tab-ico" data-lucide="flask-conical"></i>Featurization</div><div style="font-size:0.7rem;color:var(--text-muted)">Morgan (2048) · MACCS (167) · RDKit (15)</div></div>
+                            <div class="card" style="text-align:center;padding:0.8rem"><div class="section-header" style="font-size:0.75rem;justify-content:center;margin-bottom:0.3rem"><i class="tab-ico" data-lucide="git-merge"></i>Scaffold Split</div><div style="font-size:0.7rem;color:var(--text-muted)">Murcko 80/20 · Novel chemotypes</div></div>
+                        </div>
+                        <div style="display:flex;flex-wrap:wrap;gap:0.4rem;justify-content:center;margin:0.8rem 0">
+                            <span class="badge badge-blue">XGBoost</span><span class="badge badge-green">RandomForest</span><span class="badge badge-amber">LightGBM</span><span class="badge badge-purple">Conformal (MAPIE CV+ 90% CI)</span><span class="badge badge-cyan">Ensemble</span>
+                        </div>
+                        <div style="text-align:center;font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem"><i class="tab-ico" data-lucide="arrow-down" style="width:12px;height:12px"></i> XGBoost → RandomForest → LightGBM → Conformal → Ensemble <i class="tab-ico" data-lucide="arrow-down" style="width:12px;height:12px"></i></div>
+                        <div class="sci-box" style="font-size:0.7rem;margin-bottom:0.8rem"><b>Conformal Prediction:</b> Each prediction is accompanied by a 90% confidence interval. Coverage (fraction of true values within predicted intervals) is the primary reliability metric — target ≥0.85.</div>
+                    </div>
+                    <div class="card">
+                        <div class="section-header"><i class="tab-ico" data-lucide="book-open"></i>Literature Benchmark Comparison</div>
+                        <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.7rem">Our conformal XGBoost vs published multi-target QSAR baselines, per-subtype R².</p>
+                        <div class="table-wrap">
+                            <table><thead><tr><th>Model</th><th>Method</th><th>Split</th><th>A1 R²</th><th>A2A R²</th><th>A2B R²</th><th>A3 R²</th></tr></thead><tbody id="benchmark-table-body"></tbody></table>
+                        </div>
+                    </div>
+                    <div class="grid-2" style="margin-top:1rem">
+                        <div class="card">
+                            <div class="section-header"><i class="tab-ico" data-lucide="database"></i>Training Data Sources</div>
+                            <div style="font-size:0.75rem;line-height:1.7;color:var(--text-secondary)">
+                                <div style="margin-bottom:0.5rem"><b style="color:#38bdf8">ChEMBL (Primary Source)</b><br><code style="font-size:0.65rem">data/raw/AR_all_unique_parents_with_smiles.csv</code><br>33,401 pChEMBL values · Confidence ≥ 6 · K<sub>i</sub>/K<sub>d</sub>/IC<sub>50</sub>/EC<sub>50</sub></div>
+                                <div><b style="color:#38bdf8">GPCRdb (Supplementary)</b><br><code style="font-size:0.65rem">data/raw/GPCRdb_A1.xlsx</code> … <code>A3.xlsx</code><br>Curated ligand annotations · Confidence score 9</div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="section-header"><i class="tab-ico" data-lucide="hard-drive"></i>Processed Training Artifacts</div>
+                            <div style="font-size:0.7rem;line-height:1.8;color:var(--text-muted)">
+                                <code>train_smiles.pkl</code> — Canonical training SMILES<br>
+                                <code>train_fps.pkl</code> — Morgan fingerprints for AD<br>
+                                <code>features_train.pkl</code> — Full feature matrix<br>
+                                <code>global_split.json</code> — Scaffold split indices<br>
+                                <code>db_lookup_train.json</code> — SMILES → pChEMBL lookup<br>
+                                <code>smiles_to_pdb.json</code> — Known ligand PDB mappings
+                            </div>
+                            <div style="margin-top:0.6rem;display:flex;gap:0.5rem;flex-wrap:wrap">
+                                <a href="/api/download_dataset" download class="btn" style="display:inline-flex;text-decoration:none;font-size:0.7rem;padding:0.3rem 0.8rem"><i class="tab-ico" data-lucide="download"></i>Download Training Dataset CSV</a>
+                                <a href="/api/download_full_database" download class="btn" style="display:inline-flex;text-decoration:none;font-size:0.7rem;padding:0.3rem 0.8rem"><i class="tab-ico" data-lucide="download-cloud"></i>Download Full Database CSV</a>
+                            </div>
+                            <div style="font-size:0.6rem;color:var(--text-muted);margin-top:0.4rem"><b>Reproducibility:</b> Run <code>python src/retrain_production.py</code> to regenerate all outputs from raw sources.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="app-footer">
+        Adenosine Receptor Selectivity Platform · Conformal Multi-Model ML · 4 adenosine receptor subtypes
+    </div>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="/static/js/app.js?v=4.0"></script>
+</body>
+
+</html>
