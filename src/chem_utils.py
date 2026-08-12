@@ -230,16 +230,16 @@ def lookup_pdb_ids(smiles: str) -> list[dict]:
 
 
 def topk_tanimoto_with_pdb(smiles: str, k: int = 5) -> tuple[Optional[str], list[dict]]:
+    from src.pdb_utils import real_structure_refs_with_analogs
     canon, top = topk_tanimoto(smiles, k=k)
     if not top:
         return canon, []
     results = []
     for smi, tan in top:
-        pdb_info = lookup_pdb_ids(smi)
         results.append({
             "smiles": smi,
             "tanimoto": tan,
-            "pdb_entries": pdb_info,
+            "real_structures": real_structure_refs_with_analogs(smi),
         })
     return canon, results
 

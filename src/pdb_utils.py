@@ -1,6 +1,7 @@
 from __future__ import annotations
 import re
 import time
+from functools import lru_cache
 from typing import Optional
 import requests
 
@@ -187,7 +188,95 @@ def search_pdb_by_smiles(smiles: str, max_results: int = 3) -> list[dict]:
     return entries
 
 
-from functools import lru_cache
+CHEMBL_API = "https://www.ebi.ac.uk/chembl/api/data"
+
+@lru_cache(maxsize=512)
+def get_chembl_for_smiles(smiles: str) -> dict | None:
+    """Return the real ChEMBL compound card for this SMILES, or None if it is not in ChEMBL.
+
+    Only returns a record the database actually holds (a real chembl_id) — never invents one.
+    """
+    if not smiles or len(smiles) < 3:
+        return None
+    try:
+        r = requests.get(f"{CHEMBL_API}/molecule/smiles/{smiles}", timeout=_TIMEOUT)
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        cid = data.get("molecule_chembl_id")
+        if not cid:
+            return None
+        return {
+            "chembl_id": cid,
+            "name": data.get("pref_name") or cid,
+            "url": f"https://www.ebi.ac.uk/chembl/compound_report_card/{cid}/",
+        }
+    except Exception:
+        return None
+
+
+@lru_cache(maxsize=512)
+def real_structure_refs(smiles: str) -> list[dict]:
+    """Real deposited structures for a SMILES: RCSB PDB entries plus a ChEMBL record.
+
+    Only returns structures that actually exist in a public database. There is no
+    fallback generation here. When the exact molecule has no deposited structure,
+    the list is empty on purpose — callers that want a "closest real" option use
+    nearest_similar_reals() separately so a generated conformer is never presented
+    as a deposited structure.
+    """
+    refs = []
+    try:
+        for p in get_pdb_ids_for_smiles(smiles):
+            refs.append({
+                "type": "pdb",
+                "id": p["pdb_id"],
+                "name": p.get("name", p["pdb_id"]),
+                "url": p["url"],
+            })
+    except Exception:
+        pass
+    try:
+        c = get_chembl_for_smiles(smiles)
+        if c:
+            refs.append({"type": "chembl", "id": c["chembl_id"], "name": c.get("name", c["chembl_id"]), "url": c["url"]})
+    except Exception:
+        pass
+    return refs
+
+
+@lru_cache(maxsize=512)
+def nearest_similar_reals(smiles: str, max_results: int = 2) -> list[dict]:
+    """The nearest actually-deposited structures that are similar to `smiles`.
+
+    When a molecule has no exact deposited structure, scientists look up its
+    nearest real analog instead of inventing one. Uses RCSB's real chemical
+    fingerprint-similarity search, which returns genuine, published PDB entries.
+    """
+    if not smiles or len(smiles) < 3:
+        return []
+    try:
+        hits = search_pdb_similar(smiles, max_results=max_results)
+        return [
+            {"type": "similar", "id": h["pdb_id"], "name": f"nearest deposited analog",
+             "score": h.get("score", 0.0), "url": h["url"]}
+            for h in hits if h.get("pdb_id")
+        ]
+    except Exception:
+        return []
+
+
+def real_structure_refs_with_analogs(smiles: str) -> list[dict]:
+    """Exact real structures, or — when none are deposited — the nearest real analogs.
+
+    Every returned entry is a real deposited structure (PDB, ChEMBL, or a similar
+    PDB complex). Never a generated conformer.
+    """
+    refs = real_structure_refs(smiles)
+    if not refs:
+        refs = nearest_similar_reals(smiles)
+    return refs
+
 
 @lru_cache(maxsize=512)
 def get_pdb_ids_for_smiles(smiles: str) -> list[dict]:

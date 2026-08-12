@@ -19,10 +19,12 @@ try:
 except ModuleNotFoundError:
     mapie = None
 
+
 class AverageEnsemble:
     """Equal-weight average ensemble model wrapper for stacked prediction."""
     def predict(self, X):
         return np.mean(X, axis=1)
+
 
 setattr(sys.modules['__main__'], 'AverageEnsemble', AverageEnsemble)
 
@@ -40,15 +42,165 @@ import streamlit as st
 import pandas as pd
 from src.config import SUBTYPES
 from src.app.css import _CSS
-from src.app.components.sidebar import render_sidebar
 from src.app.pages.single_predict import render_single_predict
 from src.app.components.batch_predict import render_batch_predict
 from src.app.pages.model_results import render_model_results
 from src.app.components.model_reports import _load_json
 
 
+# ─────────────────────────────────────────────────────────────
+# Site shell: background layers + navbar + hero + footer
+# (transplanted verbatim from src/static/index.html)
+# ─────────────────────────────────────────────────────────────
+
+_BACKGROUND = """
+<div class="bg-orbs">
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <div class="bg-orb bg-orb-3"></div>
+</div>
+<svg class="neural-paths" viewBox="0 0 1400 900" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <path class="neural-line neural-line-1" d="M0,200 C300,180 400,350 700,300 S1100,150 1400,220" stroke="url(#nGrad1)" stroke-width="1" fill="none"/>
+  <path class="neural-line neural-line-2" d="M0,500 C250,480 500,600 750,520 S1050,400 1400,480" stroke="url(#nGrad2)" stroke-width="1" fill="none"/>
+  <path class="neural-line neural-line-3" d="M0,750 C350,720 600,850 850,780 S1200,680 1400,740" stroke="url(#nGrad3)" stroke-width="1" fill="none"/>
+  <defs>
+    <linearGradient id="nGrad1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="rgba(56,189,248,0)"/><stop offset="50%" stop-color="rgba(56,189,248,0.15)"/><stop offset="100%" stop-color="rgba(167,139,250,0)"/></linearGradient>
+    <linearGradient id="nGrad2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="rgba(74,222,128,0)"/><stop offset="50%" stop-color="rgba(74,222,128,0.12)"/><stop offset="100%" stop-color="rgba(56,189,248,0)"/></linearGradient>
+    <linearGradient id="nGrad3" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="rgba(167,139,250,0)"/><stop offset="50%" stop-color="rgba(167,139,250,0.10)"/><stop offset="100%" stop-color="rgba(74,222,128,0)"/></linearGradient>
+  </defs>
+  <circle class="neural-pulse neural-pulse-1" r="3" fill="#38bdf8" opacity="0.6"><animateMotion dur="8s" repeatCount="indefinite" path="M0,200 C300,180 400,350 700,300 S1100,150 1400,220"/></circle>
+  <circle class="neural-pulse neural-pulse-2" r="2.5" fill="#4ade80" opacity="0.5"><animateMotion dur="10s" repeatCount="indefinite" path="M0,500 C250,480 500,600 750,520 S1050,400 1400,480"/></circle>
+  <circle class="neural-pulse neural-pulse-3" r="2" fill="#a78bfa" opacity="0.4"><animateMotion dur="12s" repeatCount="indefinite" path="M0,750 C350,720 600,850 850,780 S1200,680 1400,740"/></circle>
+</svg>
+<div class="dot-grid"></div>
+<canvas id="particle-canvas"></canvas>
+<script>
+(function(){
+  var c=document.getElementById('particle-canvas');
+  if(!c||c.dataset.initialized)return;
+  c.dataset.initialized='1';
+  if(window.__pLoop) cancelAnimationFrame(window.__pLoop);
+  var ctx=c.getContext('2d'),W,H,pts=[],LINK=140;
+  function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight;}
+  window.addEventListener('resize',resize);resize();
+  for(var i=0;i<55;i++)pts.push({x:Math.random()*W,y:Math.random()*H,
+    vx:(Math.random()-0.5)*0.2,vy:(Math.random()-0.5)*0.2,r:Math.random()*1.8+0.6,p:Math.random()*Math.PI});
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    for(var i=0;i<pts.length;i++)for(var j=i+1;j<pts.length;j++){
+      var dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d2=dx*dx+dy*dy;
+      if(d2<LINK*LINK){var a=(1-d2/(LINK*LINK))*0.45;
+        ctx.strokeStyle='rgba(148,163,184,'+a+')';ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.stroke();}}
+    for(var k=0;k<pts.length;k++){
+      var p=pts[k];p.x+=p.vx;p.y+=p.vy;p.p+=0.002;
+      if(p.x<-10)p.x=W+10;else if(p.x>W+10)p.x=-10;
+      if(p.y<-10)p.y=H+10;else if(p.y>H+10)p.y=-10;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      var g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*4);
+      g.addColorStop(0,'rgba(56,189,248,'+(0.35+0.15*Math.sin(p.p))+')');
+      g.addColorStop(1,'rgba(56,189,248,0)');ctx.fillStyle=g;ctx.fill();}
+    window.__pLoop=requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>
+"""
+
+_NAVBAR = """
+<header class="navbar anim-in">
+  <div class="brand">
+    <svg class="motion-icon icon-spin brand-ring" width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="12" r="4" stroke="#38bdf8" stroke-width="1.5"/>
+      <circle cx="12" cy="4" r="2" fill="#a78bfa"/>
+      <circle cx="20" cy="12" r="1.5" fill="#4ade80"/>
+      <circle cx="12" cy="20" r="1.5" fill="#fbbf24"/>
+    </svg>
+    <div>
+      <h1>Adenosine Selectivity Platform</h1>
+      <p>Conformal Multi-Model ML &middot; GPCR Profiling across A<sub>1</sub>, A<sub>2A</sub>, A<sub>2B</sub>, A<sub>3</sub></p>
+    </div>
+  </div>
+</header>
+"""
+
+
+def _hero(m) -> str:
+    return f"""
+<div class="hero-banner reveal" id="hero-banner">
+  <div class="hero-inner">
+    <div class="hero-text">
+      <span class="hero-badge">&#128737; Conformal ML</span>
+      <h2 class="hero-title">Predict Adenosine Receptor<br>Selectivity with Confidence</h2>
+      <p class="hero-sub">Multi-model ensemble (XGBoost, LightGBM, RandomForest, Stacking) trained on {m['n']} pChEMBL records with MAPIE 90% conformal prediction intervals across A<sub>1</sub>, A<sub>2A</sub>, A<sub>2B</sub>, A<sub>3</sub>.</p>
+      <div class="hero-stats">
+        <div class="hero-stat"><span class="hero-stat-num" data-count="4">0</span><span class="hero-stat-label">Receptor Subtypes</span></div>
+        <div class="hero-stat"><span class="hero-stat-num" data-count="33401">0</span><span class="hero-stat-label">Training Records</span></div>
+        <div class="hero-stat"><span class="hero-stat-num" data-count="4">0</span><span class="hero-stat-label">ML Models</span></div>
+        <div class="hero-stat"><span class="hero-stat-num" data-count="90">0</span><span class="hero-stat-label">% Conformal CI</span></div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="hero-molecule-ring">
+        <svg class="hero-ring-svg" viewBox="0 0 260 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="130" cy="130" r="118" stroke="url(#heroGrad)" stroke-width="1.5" opacity="0.5"/>
+          <circle cx="130" cy="130" r="95" stroke="url(#heroGrad2)" stroke-width="1" opacity="0.35"/>
+          <circle cx="130" cy="130" r="72" stroke="rgba(56,189,248,0.15)" stroke-width="1" stroke-dasharray="6 8"/>
+          <defs>
+            <linearGradient id="heroGrad" x1="0" y1="0" x2="260" y2="260"><stop offset="0%" stop-color="#38bdf8"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient>
+            <linearGradient id="heroGrad2" x1="260" y1="0" x2="0" y2="260"><stop offset="0%" stop-color="#4ade80"/><stop offset="100%" stop-color="#38bdf8"/></linearGradient>
+          </defs>
+        </svg>
+        <div class="hero-molecule-icon">
+          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="5" stroke="#38bdf8" stroke-width="1.5"/>
+            <circle cx="12" cy="5" r="2.2" fill="#a78bfa"/>
+            <circle cx="19" cy="12" r="1.8" fill="#4ade80"/>
+            <circle cx="12" cy="19" r="1.8" fill="#fbbf24"/>
+          </svg>
+        </div>
+        <div class="hero-orbit-dot hero-orbit-1"></div>
+        <div class="hero-orbit-dot hero-orbit-2"></div>
+        <div class="hero-orbit-dot hero-orbit-3"></div>
+        <div class="hero-orbit-dot hero-orbit-4"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){{
+  var counters=document.querySelectorAll('.hero-stat-num[data-count]');
+  if(!counters.length)return;
+  if(window.__heroCounted){{counters.forEach(function(e){{e.textContent=(+e.getAttribute('data-count')).toLocaleString();}});return;}}
+  window.__heroCounted=true;
+  var obs=new IntersectionObserver(function(entries){{
+    entries.forEach(function(entry){{
+      if(!entry.isIntersecting)return;
+      var el=entry.target,target=parseInt(el.getAttribute('data-count'),10);
+      if(isNaN(target))return; obs.unobserve(el);
+      var dur=1200,start=performance.now();
+      (function tick(now){{
+        var p=Math.min((now-start)/dur,1),ease=1-Math.pow(1-p,3);
+        el.textContent=Math.round(ease*target).toLocaleString();
+        if(p<1)requestAnimationFrame(tick);
+      }})(start);
+    }});
+  }},{{threshold:0.3}});
+  counters.forEach(function(c){{obs.observe(c);}});
+}})();
+</script>
+"""
+
+_FOOTER = """
+<div class="app-footer">
+  Adenosine Receptor Selectivity Platform &middot; Conformal Multi-Model ML &middot; 4 adenosine receptor subtypes
+</div>
+"""
+
+
 def run_app():
-    st.set_page_config(page_title="AR Selectivity Predictor", layout="wide")
+    st.set_page_config(page_title="Adenosine Receptor Selectivity Predictor", layout="wide",
+                       initial_sidebar_state="collapsed")
 
     # Initialize session state variables
     for k in ("history", "history_df", "pred"):
@@ -56,41 +208,14 @@ def run_app():
             st.session_state[k] = [] if k == "history" else pd.DataFrame() if k == "history_df" else None
 
     st.html(_CSS)
+    st.html(_BACKGROUND)
+    st.html(_NAVBAR)
 
-    # Particle background
-    st.html(
-        '<canvas id="particle-canvas"></canvas>'
-        '<script>'
-        '(function(){'
-        'let c=document.getElementById("particle-canvas");'
-        'if(!c||c.dataset.initialized)return;c.dataset.initialized="1";'
-        'let ctx=c.getContext("2d"),W,H;'
-        'function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight;}'
-        'window.addEventListener("resize",resize);resize();'
-        'let pts=[];for(let i=0;i<40;i++){pts.push({'
-        'x:Math.random()*W,y:Math.random()*H,'
-        'vx:(Math.random()-0.5)*0.25,vy:-(Math.random()*0.12+0.03),'
-        'r:Math.random()*2.5+0.5,o:Math.random()*0.3+0.05,p:0})}'
-        'function draw(){ctx.clearRect(0,0,W,H);'
-        'for(let p of pts){'
-        'p.x+=p.vx;p.y+=p.vy;p.p+=0.003;'
-        'p.o=0.12+0.12*Math.sin(p.p);'
-        'if(p.y<-10||p.x<-10||p.x>W+10){p.y=H+10;p.x=Math.random()*W;p.vx=(Math.random()-0.5)*0.25;}'
-        'ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);'
-        'let g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*5);'
-        'g.addColorStop(0,`rgba(56,189,248,${p.o})`);'
-        'g.addColorStop(1,"rgba(56,189,248,0)");'
-        'ctx.fillStyle=g;ctx.fill();}'
-        'for(let i=0;i<pts.length;i++){for(let j=i+1;j<pts.length;j++){'
-        'let dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);'
-        'if(d<150){ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);'
-        'ctx.strokeStyle=`rgba(56,189,248,${0.03*(1-d/150)})`;ctx.lineWidth=0.5;ctx.stroke();}}}'
-        'requestAnimationFrame(draw)}draw();})();'
-        '</script>')
-
+    # Real model metrics when the evaluation report exists, else literature defaults
     rp = Path("outputs/validoutput/precise/evaluation_precise_report.json")
-    m = {"r2": "0.620", "mae": "0.550", "n": "33,401", "A1": ["0.620", "0.580", "8,272"], "A2A": ["0.660", "0.510", "8,407"], "A2B": ["0.580", "0.550", "8,290"], "A3": ["0.640", "0.540", "8,432"]}
-    is_real_model = False
+    m = {"r2": "0.620", "mae": "0.550", "n": "33,401",
+         "A1": ["0.620", "0.580", "8,272"], "A2A": ["0.660", "0.510", "8,407"],
+         "A2B": ["0.580", "0.550", "8,290"], "A3": ["0.640", "0.540", "8,432"]}
     if rp.exists():
         try:
             ed = _load_json(str(rp)) or {}
@@ -98,80 +223,27 @@ def run_app():
             if ov.get("model_r2") is not None:
                 m["r2"] = f"{ov['model_r2']:.3f}"
                 m["mae"] = f"{ov['model_mae']:.3f}"
-                m["n"] = f"{ed.get('n_train',0)+ed.get('n_test',0):,}"
-                is_real_model = True
+                m["n"] = f"{ed.get('n_train', 0) + ed.get('n_test', 0):,}"
             for s in SUBTYPES:
                 sd = ed.get("per_subtype", {}).get(s, {})
                 if sd:
-                    m[s] = [f"{sd.get('model_r2',0):.3f}", f"{sd.get('model_mae',0):.3f}", f"{sd.get('n_train',0)+sd.get('n_test',0):,}"]
+                    m[s] = [f"{sd.get('model_r2', 0):.3f}", f"{sd.get('model_mae', 0):.3f}",
+                            f"{sd.get('n_train', 0) + sd.get('n_test', 0):,}"]
         except Exception:
             pass
 
-    status_tags = ""
-    if is_real_model:
-        status_tags = '<span class="badge badge-blue"><svg class="motion-icon icon-pulse" width="8" height="8"><circle cx="4" cy="4" r="3" fill="#38bdf8"/></svg> 90% CIs</span><span class="badge badge-green">Scaffold CV</span><span class="badge badge-purple">3-Model Ensemble</span>'
-    else:
-        status_tags = '<span class="badge badge-amber"><svg class="motion-icon icon-pulse" width="8" height="8"><circle cx="4" cy="4" r="3" fill="#facc15"/></svg> Literature Benchmarks</span>'
+    st.html(_hero(m))
 
-    st.markdown(f'''
-    <div class="hero anim-in">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.5rem">
-        <div style="flex:1">
-          <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem">
-            <span class="badge badge-cyan" style="font-size:.6rem">
-              <svg class="motion-icon icon-spin icon-glow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><path d="M12 9L17 6M12 15L7 18"/></svg>
-              v2.0 · Conformal ML
-            </span>
-            <span class="badge badge-purple" style="font-size:.6rem">
-              <svg class="motion-icon icon-float" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg>
-              GPCR Selectivity
-            </span>
-          </div>
-          <h1>Adenosine Receptor<br>Selectivity Predictor</h1>
-          <p>Rapid <i>in silico</i> pChEMBL profiling across A<sub>1</sub>, A<sub>2A</sub>, A<sub>2B</sub>, A<sub>3</sub> &middot; XGBoost + RF + LightGBM + Stacked ensemble + conformal prediction</p>
-          <div class="badge-row" style="margin-top:.6rem">
-            <span class="badge badge-blue">R² {m["r2"]}</span><span class="badge badge-green">MAE {m["mae"]}</span><span class="badge badge-purple">{m["n"]} compounds</span>
-            {status_tags}
-          </div>
-        </div>
-      </div>
-      <div class="dash-grid" style="margin-top:.9rem">
-        <div class="dash-card anim-in-d1"><div class="dash-label">Overall</div><div class="dash-value" style="font-size:1.05rem">R² {m["r2"]}</div><div class="dash-sub" style="font-size:.68rem">MAE {m["mae"]}</div></div>
-        {"".join(f'<div class="dash-card anim-in-d{i+1}"><div class="dash-label">A<sub>{s[1:].lower()}</sub></div><div class="dash-value">{m[s][0]}</div><div class="dash-sub">MAE {m[s][1]}</div></div>' if isinstance(m.get(s),list) else "" for i,s in enumerate(["A1","A2A","A2B","A3"],1))}
-      </div>
-      <svg class="flow-svg" viewBox="0 0 600 20" style="margin-top:.4rem;height:20px">
-        <defs><linearGradient id="hg" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stop-color="#38bdf8"><animate attributeName="stop-color" values="#38bdf8;#a855f7;#38bdf8" dur="5s" repeatCount="indefinite"/></stop>
-          <stop offset="100%" stop-color="#a855f7"><animate attributeName="stop-color" values="#a855f7;#2ecc71;#a855f7" dur="4s" repeatCount="indefinite"/></stop>
-        </linearGradient></defs>
-        <line x1="20" y1="10" x2="580" y2="10" stroke="url(#hg)" stroke-width="1.5" stroke-dasharray="4 6" opacity="0.5">
-          <animate attributeName="stroke-dashoffset" from="20" to="0" dur="2s" repeatCount="indefinite"/>
-        </line>
-      </svg>
-    </div>'''
-, unsafe_allow_html=True)
-
-    with st.expander("💡 Why this tool? — Drug discovery made faster", expanded=False):
-        st.markdown(
-            '<div class="sci-box">'
-            "<strong>🎯 The Problem:</strong> Adenosine receptors (A<sub>1</sub>, A<sub>2A</sub>, A<sub>2B</sub>, A<sub>3</sub>) "
-            "are validated drug targets for cardiovascular disease, inflammation, cancer immunotherapy, and CNS disorders. "
-            "But designing <strong>subtype-selective</strong> ligands is one of the hardest challenges in GPCR drug discovery — "
-            "the four subtypes share >70% sequence identity in the transmembrane binding pocket.<br><br>"
-            "<strong>⚡ Our Solution:</strong> A multi-model ML ensemble (XGBoost + RandomForest + LightGBM + Ridge Stacking) "
-            "trained on 33K+ pChEMBL values with conformal prediction intervals that quantify uncertainty. "
-            "Enter a SMILES string or PDB ID and get <strong>instant pChEMBL predictions</strong> across all 4 subtypes, "
-            "selectivity ratios, drug-likeness profiles, PAINS alerts, and SHAP explanations — all in one place."
-            '</div>', unsafe_allow_html=True)
-
-    render_sidebar()
-    t1, t2, t3 = st.tabs(["Single molecule", "Batch CSV", "Model results"])
+    t1, t2, t3 = st.tabs(["Single Molecule", "Batch CSV", "Model Results Hub"])
     with t1:
         render_single_predict()
     with t2:
         render_batch_predict()
     with t3:
         render_model_results()
+
+    st.html(_FOOTER)
+
 
 if __name__ == "__main__":
     run_app()

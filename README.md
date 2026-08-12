@@ -131,9 +131,8 @@ Adenosine_Selectivity_Model/
 │   ├── diagnostics/              # Data quality diagnostics
 │   │   └── a1_diagnosis.py
 │   │
-│   ├── # Structure & Docking
-│   ├── docking.py                # Receptor similarity tables (no API calls)
-│   ├── pdb_utils.py              # RCSB PDB search utilities
+│   ├── # Structure & Real Deposited PDB
+│   ├── pdb_utils.py              # RCSB PDB + ChEMBL real-structure lookups
 │   ├── pharmacophore.py          # Pharmacophore features
 │   │
 │   ├── # Streamlit App
@@ -141,11 +140,10 @@ Adenosine_Selectivity_Model/
 │       ├── css.py                # Custom styling
 │       ├── components/
 │       │   ├── sidebar.py
-│       │   ├── docking_panel.py  # Multi-receptor similarity analysis
 │       │   ├── model_reports.py  # Report loading utilities
 │       │   └── batch_predict.py
 │       └── pages/
-│           ├── single_predict.py # Single molecule + SHAP + docking panel
+│           ├── single_predict.py # Single molecule + SHAP + real PDB neighbors
 │           ├── batch_predict.py  # CSV batch screening
 │           └── model_results.py  # 6-tab evaluation dashboard
 │

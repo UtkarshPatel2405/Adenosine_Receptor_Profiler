@@ -12,8 +12,6 @@ from rdkit.Chem import DataStructs
 from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator
 
 from src.config import MODELS_DIR, PROCESSED_DATA_DIR, SUBTYPES
-from src.chem_utils import lookup_pdb_ids
-from src.docking import ADENOSINE_TARGETS
 
 logger = logging.getLogger(__name__)
 
@@ -100,13 +98,14 @@ def _activity_badge(pchembl):
 
 
 def _neighbor_records(sim, smiles, tanimoto, pchembl=None):
+    from src.pdb_utils import real_structure_refs_with_analogs
     _, sim_label = _tanimoto_badge(tanimoto)
     try:
-        pdbs = [{"pdb_id": p["pdb_id"], "name": p.get("name", "")} for p in lookup_pdb_ids(smiles)[:3]]
+        refs = real_structure_refs_with_analogs(smiles)
     except Exception:
-        pdbs = []
+        refs = []
     rec = {"smiles": smiles, "tanimoto": round(tanimoto, 3), "similarity_label": sim_label,
-           "pdb_entries": pdbs}
+           "real_structures": refs}
     if pchembl is not None:
         _, act_label = _activity_badge(pchembl)
         rec["pchembl"] = round(pchembl, 2)
@@ -141,6 +140,19 @@ def receptor_neighbors(smiles: str, subtype: str, top_k: int = 10):
     return [_neighbor_records(round(s, 3), t, s, p) for s, t, p in scored[:top_k]]
 
 
+_RECEPTOR_TEMPLATES = {  # real deposited receptor complexes used for the co-crystal viewer
+    "A1": "6D9H", "A2A": "2YDO", "A2B": "8HDP", "A3": "8YH2",
+}
+
+# Verified via RCSB: each template is an adenosine/endogenous-agonist-bound complex.
+_RECEPTOR_TEMPLATE_TITLE = {
+    "6D9H": "Human A1–Gi2 complex bound to endogenous agonist",
+    "2YDO": "Thermostabilised human A2A receptor with adenosine bound",
+    "8HDP": "Human A2B receptor bound to adenosine",
+    "8YH2": "Human A3–Gi complex bound to adenosine",
+}
+
+
 def receptors_overview(smiles: str):
     """Max similarity + active-neighbor count per subtype."""
     train_smiles, train_fps, lookup = _load_training()
@@ -167,7 +179,8 @@ def receptors_overview(smiles: str):
         max_sim = max((s for s, _ in entries), default=0.0)
         n_active = sum(1 for _, p in entries if p >= 6.0)
         out[st] = {"max_similarity": round(max_sim, 3), "active_neighbors": n_active,
-                   "pdb": ADENOSINE_TARGETS.get(st, {}).get("pdb")}
+                   "pdb": _RECEPTOR_TEMPLATES.get(st),
+                   "pdb_title": _RECEPTOR_TEMPLATE_TITLE.get(_RECEPTOR_TEMPLATES.get(st) or "", "")}
     return out
 
 

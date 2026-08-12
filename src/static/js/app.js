@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+﻿document.addEventListener('DOMContentLoaded', () => {
     if (window.lucide) {
         lucide.createIcons();
         // Auto-compile icons injected later. Guard: only react to <i> placeholders,
@@ -364,17 +364,24 @@ function loadPdbComplex(pdbId, viewerEl) {
     }
 }
 
-function pdb3dCell(smiles, pdbEntries, pdbId) {
+// Show only real deposited structures (RCSB PDB + ChEMBL). No generated conformers.
+function realStructCell(refs, pdbId) {
     let links = '';
     if (pdbId) {
         links += `<a class="badge badge-blue" target="_blank" href="https://www.rcsb.org/structure/${pdbId}" title="Receptor co-crystal structure">${pdbId}</a> `;
     }
-    (pdbEntries || []).forEach(p => {
-        if (p.pdb_id) links += `<a class="badge badge-blue" target="_blank" href="https://www.rcsb.org/structure/${p.pdb_id}" title="${p.name || p.pdb_id}">${p.pdb_id}</a> `;
+    (refs || []).forEach(r => {
+        const isChembl = r.type === 'chembl';
+        const cls = isChembl ? 'badge-purple' : r.type === 'similar' ? 'badge-cyan' : 'badge-blue';
+        const href = r.url || (isChembl
+            ? 'https://www.ebi.ac.uk/chembl/compound_report_card/' + r.id + '/'
+            : 'https://www.rcsb.org/structure/' + r.id);
+        const title = r.type === 'similar' ? `Nearest deposited analog (RCSB similarity ${r.score})` : (r.name || r.id);
+        links += `<a class="badge ${cls}" target="_blank" href="${href}" title="${title}">${r.id}</a> `;
     });
-    const enc = encodeURIComponent(smiles || '');
-    links += `<a class="badge badge-cyan" title="Download generated 3D PDB conformer" href="/api/predict/neighbor_3d?smiles=${enc}&format=pdb">3D PDB</a> `;
-    links += `<a class="badge badge-purple" title="Download generated 3D SDF conformer" href="/api/predict/neighbor_3d?smiles=${enc}&format=sdf">3D SDF</a>`;
+    if (!links) {
+        links = '<span style="color:var(--text-muted);font-size:0.72rem" title="No deposited structure in PDB or ChEMBL">No real structure</span>';
+    }
     return links;
 }
 
@@ -457,8 +464,6 @@ function renderSingleResults(data, target) {
         ? `<div class="mol2d-wrap">${data.svg_2d}</div>`
         : '<p style="color:var(--text-muted)">2D depiction unavailable</p>';
 
-    const shapRows = Array.isArray(data.shap_top_features) ? data.shap_top_features.slice(0, 6) : [];
-
     // ── Applicability Domain alert ──
     const ad = data.applicability_domain;
     let adHtml = '<div class="metric-box"><div class="metric-label">Applicability Domain</div><div class="metric-value" style="font-size:1rem">—</div></div>';
@@ -477,16 +482,42 @@ function renderSingleResults(data, target) {
 
     // ── Top-10 global training neighbors ──
     const glob = Array.isArray(data.neighbors_global) ? data.neighbors_global : [];
+
+    // Out-of-scope gate: when the molecule is outside the model's applicability
+    // domain, no numerical prediction is surfaced as if it were reliable. The
+    // regressor always returns a number; we refuse to present it as one.
+    const admitted = data.admitted === true;
+    const outScopeHtml = `
+        <div class="ad-warning-box" style="margin:0.5rem 0">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem">
+                <i data-lucide="alert-triangle" style="width:18px;height:18px;color:#f87171"></i>
+                <span style="font-size:0.85rem;font-weight:700;color:#f87171">Out of Model Scope — prediction not shown</span>
+            </div>
+            <div class="metric-sub" style="color:#cbd5e1">
+                Max Tanimoto to training set = <b>${ad ? ad.max_tanimoto : '—'}</b> (&lt; 0.4). This molecule shares almost nothing with the
+                adenosine-ligand training data, so the model would extrapolate. Instead of a fabricated pChEMBL, the tool reports the
+                nearest <b>real</b> training neighbors below — use them as experimental reference.
+            </div>
+        </div>
+        <div class="card dark-card" style="margin:0;padding:1.2rem;text-align:center">
+            <div style="font-size:2.2rem;margin-bottom:0.4rem"><i data-lucide="circle-slash" style="width:34px;height:34px;color:#f87171"></i></div>
+            <div style="font-weight:700;color:#f8fafc">No affinity prediction for this compound</div>
+            <div class="metric-sub" style="color:#94a3b8;max-width:520px;margin:0.5rem auto">The model is trained on adenosine-receptor ligands
+                (A₁, A₂A, A₂B, A₃). For molecules far outside that chemical space, pChEMBL values would be unvalidated extrapolations.
+                See the neighbors section for real measured activities of the closest deposited analogs.</div>
+        </div>`;
     const globRows = glob.map((n, i) => `
         <tr>
             <td>${i + 1}</td>
             <td><code title="${n.smiles}">${n.smiles.length > 34 ? n.smiles.slice(0, 34) + '…' : n.smiles}</code></td>
             <td><span class="badge badge-${n.class}">${n.label}</span></td>
-            <td>${pdb3dCell(n.smiles, n.pdb_entries)}</td>
+            <td>${n.pchembl !== undefined ? `<strong>${n.pchembl}</strong>` : '<span style="color:var(--text-muted)">—</span>'}</td>
+            <td>${n.activity ? `<span class="badge badge-${n.pchembl >= 6 ? 'green' : n.pchembl >= 4.5 ? 'amber' : 'red'}">${n.activity}</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
+            <td>${realStructCell(n.real_structures || (n.pdb_entries || []).map(p => ({ type: 'pdb', id: p.pdb_id, name: p.name })))}</td>
         </tr>`).join('');
     const globHtml = glob.length ? `
         <div class="table-wrap" style="max-height:340px;overflow-y:auto">
-            <table><thead><tr><th>#</th><th>SMILES</th><th>Tanimoto</th><th>PDB / 3D Structure</th></tr></thead><tbody>${globRows}</tbody></table>
+            <table><thead><tr><th>#</th><th>SMILES</th><th>Tanimoto</th><th>pChEMBL</th><th>Activity</th><th>Real Structure (PDB / ChEMBL)</th></tr></thead><tbody>${globRows}</tbody></table>
         </div>` : '<p style="color:var(--text-muted)">No neighbors available.</p>';
 
     // ── Receptor Binding Analysis ──
@@ -504,7 +535,7 @@ function renderSingleResults(data, target) {
         return `<tr><td><strong>A<sub>${s.slice(1).toLowerCase()}</sub></strong></td>
             <td><span class="badge badge-${cls}">${fmtVal(o.max_similarity)}</span></td>
             <td>${o.active_neighbors || 0}</td>
-            <td>${pdb3dCell('', [], o.pdb)}</td></tr>`;
+            <td>${realStructCell([], o.pdb)}</td></tr>`;
     }).join('');
 
     // ── Real SHAP ──
@@ -549,6 +580,21 @@ function renderSingleResults(data, target) {
     const stripAdBadge = adStatus ? '<span class="badge badge-green">Inside AD</span>'
         : '<span class="badge badge-red">Outside AD</span>';
 
+    // In-database molecules: show measured (experimental) values as ground truth,
+    // distinct from the model predictions above. No fabricated agreement.
+    let dbBanner = '';
+    if (data.in_database && data.db_value) {
+        const dbCells = subtypes.map(s => {
+            const v = data.db_value[s];
+            return `<span class="badge badge-cyan" title="Measured pChEMBL in training database">A<sub>${s.slice(1).toLowerCase()}</sub>: ${(typeof v === 'number') ? v.toFixed(2) : '—'}</span>`;
+        }).join(' ');
+        dbBanner = `<div class="sci-box" style="margin-bottom:0.8rem;border-left:4px solid #22d3ee;font-size:0.75rem">
+            <b style="color:#22d3ee">Compound is in the training database.</b> Measured (experimental) pChEMBL values:
+            ${dbCells}<br>
+            <span style="color:var(--text-muted);font-size:0.68rem">Model predictions above are shown for reference; measured values are the ground truth.</span>
+        </div>`;
+    }
+
     container.innerHTML = `
     <!-- ═══ SECTION 1: Molecular Visualization — Cyan ═══ -->
     <div class="full-section section-theme-cyan">
@@ -567,10 +613,6 @@ function renderSingleResults(data, target) {
                         <div class="viz-pane" id="viz-3d">
                             <div id="viewer3d" style="height:380px"></div>
                             ${data.mol_block_3d ? '' : '<p style="color:var(--text-muted);font-size:0.75rem">3D conformer unavailable.</p>'}
-                        </div>
-                        <div style="display:flex;gap:0.4rem;margin-top:0.5rem">
-                            <a class="btn" style="padding:0.3rem 0.7rem;font-size:0.72rem;flex:1;text-align:center" href="/api/predict/neighbor_3d?smiles=${encodeURIComponent(data.smiles || '')}&format=pdb"><i class="tab-ico" data-lucide="download"></i>PDB</a>
-                            <a class="btn" style="padding:0.3rem 0.7rem;font-size:0.72rem;flex:1;text-align:center" href="/api/predict/neighbor_3d?smiles=${encodeURIComponent(data.smiles || '')}&format=sdf"><i class="tab-ico" data-lucide="download"></i>SDF</a>
                         </div>
                     </div>
                 </div>
@@ -598,6 +640,8 @@ function renderSingleResults(data, target) {
             <div class="section-num">02</div>
             <div class="section-title" style="color:#a78bfa">4-Subtype Affinity Grid</div>
             <div class="section-subtitle">Multi-model ensemble predictions across A₁, A₂A, A₂B, A₃</div>
+            ${dbBanner}
+            ${admitted ? `
             <div class="card dark-card" style="margin:0">
                 <div class="table-wrap"><table><thead>${thead}</thead><tbody>${rows}</tbody></table></div>
             </div>
@@ -607,6 +651,7 @@ function renderSingleResults(data, target) {
                 <div class="metric-box" style="text-align:center"><div class="metric-label">Selectivity</div><div style="margin-top:0.2rem">${stripSelBadge}</div></div>
                 <div class="metric-box" style="text-align:center"><div class="metric-label">AD Status</div><div style="margin-top:0.2rem">${stripAdBadge}</div></div>
             </div>
+            ` : outScopeHtml}
             <div class="knowledge-panel purple" style="margin-top:1rem">
                 <h4><i data-lucide="book-open" style="width:14px;height:14px"></i>Theory: Conformal Prediction</h4>
                 <p>Each cell shows pChEMBL ± 90% conformal interval (MAPIE). The conformal framework provides distribution-free coverage guarantees. XGBoost, RandomForest, LightGBM, and Ridge-stacking trained on 33,401 bioactivity records with Morgan fingerprints (2048-bit).</p>
@@ -621,11 +666,23 @@ function renderSingleResults(data, target) {
             <div class="section-title" style="color:#4ade80">Selectivity Profile</div>
             <div class="section-subtitle">Multi-receptor binding radar and quantitative metrics</div>
             <div class="section-split">
+                ${admitted ? `
                 <div style="display:flex;justify-content:center;align-items:center"><div class="radar-wrap"><canvas id="radar-chart" width="300" height="300"></canvas></div></div>
                 <div>
                     <div class="card dark-card" style="margin:0">
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem">${selHtml || '<p style="color:var(--text-muted)">Not available</p>'}</div>
                     </div>
+                ` : `
+                <div style="grid-column:1/-1">
+                    <div class="ad-warning-box" style="margin:0.5rem 0 0.4rem">
+                        <div style="display:flex;align-items:center;gap:0.5rem">
+                            <i data-lucide="alert-triangle" style="width:16px;height:16px;color:#f87171"></i>
+                            <span style="font-size:0.82rem;font-weight:700;color:#f87171">Selectivity withheld — out of model scope</span>
+                        </div>
+                    </div>
+                    <p style="color:var(--text-muted);font-size:0.78rem">ΔpChEMBL selectivity is not reported for molecules outside the training domain; it would be an unvalidated extrapolation.</p>
+                </div>
+                `}
                     <div class="knowledge-panel green" style="margin-top:0.8rem">
                         <h4><i data-lucide="book-open" style="width:14px;height:14px"></i>Theory: Selectivity Indices</h4>
                         <p>ΔpChEMBL between receptor pairs quantifies selectivity. Values > 0.5 indicate significant selectivity. The radar chart visualizes binding profiles — a balanced polygon means non-selective, an elongated shape reveals preferential targeting.</p>
@@ -670,7 +727,9 @@ function renderSingleResults(data, target) {
             <div class="section-title" style="color:#f43f5e">ML Explainability (SHAP)</div>
             <div class="section-subtitle">Feature importance and model interpretation</div>
             <div class="card dark-card" style="margin:0">
-                ${shapSection || '<p style="color:var(--text-muted);font-size:0.78rem">SHAP model unavailable for this target.</p>'}
+                ${admitted ? (shapSection || '<p style="color:var(--text-muted);font-size:0.78rem">SHAP model unavailable for this target.</p>')
+                    : '<div class="ad-warning-box" style="margin:0.5rem 0"><div style="display:flex;align-items:center;gap:0.5rem"><i data-lucide="alert-triangle" style="width:16px;height:16px;color:#f87171"></i><span style="font-size:0.82rem;font-weight:700;color:#f87171">SHAP interpretation withheld — out of model scope</span></div></div>'
+                }
             </div>
             <div class="knowledge-panel rose" style="margin-top:1rem">
                 <h4><i data-lucide="book-open" style="width:14px;height:14px"></i>Theory: SHAP Values</h4>
@@ -699,7 +758,7 @@ function renderSingleResults(data, target) {
             </div>
             <div class="card dark-card" style="margin:0">
                 <div class="section-header"><i class="tab-ico" data-lucide="table-2"></i>All Receptor Subtypes Overview</div>
-                <div class="table-wrap"><table><thead><tr><th>Subtype</th><th>Max Similarity</th><th>Active Neighbors</th><th>PDB</th></tr></thead><tbody>${recOverviewRows}</tbody></table></div>
+                <div class="table-wrap"><table><thead><tr><th>Subtype</th><th>Max Similarity</th><th>Active Neighbors</th><th>Real PDB</th></tr></thead><tbody>${recOverviewRows}</tbody></table></div>
             </div>
             <div class="card dark-card" style="margin-top:0.8rem">
                 <div class="section-header"><i class="tab-ico" data-lucide="users"></i>Top-10 Training Set Neighbors</div>
@@ -717,18 +776,45 @@ function renderSingleResults(data, target) {
         <div class="section-inner">
             <div class="section-num">07</div>
             <div class="section-title" style="color:#22d3ee">Experimental Complexes</div>
-            <div class="section-subtitle">Co-crystal structures from RCSB Protein Data Bank</div>
+            <div class="section-subtitle">Real deposited receptor complexes (RCSB) — all four are adenosine-bound structures</div>
             <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.8rem;align-items:center">
                 ${recSubtypes.map(s => {
         const pdbId = (recOverview[s] || {}).pdb || '';
-        return `<button class="btn pdb-btn" data-pdb="${pdbId}" data-subtype="${s}" style="padding:0.3rem 0.8rem;font-size:0.75rem">A<sub>${s.slice(1).toLowerCase()}</sub> ${pdbId ? `<span class="badge badge-highlight" style="margin-left:0.3rem">${pdbId}</span>` : '—'}</button>`;
+        const pdbTitle = (recOverview[s] || {}).pdb_title || '';
+        return `<button class="btn pdb-btn" data-pdb="${pdbId}" data-subtype="${s}" data-title="${pdbTitle}" style="padding:0.3rem 0.8rem;font-size:0.75rem">A<sub>${s.slice(1).toLowerCase()}</sub> ${pdbId ? `<span class="badge badge-highlight" style="margin-left:0.3rem">${pdbId}</span>` : '—'}</button>`;
     }).join('')}
                 <span class="rcsb-download-slot" id="rcsb-download-slot"></span>
             </div>
             <div id="complex-viewer" style="height:400px;border-radius:12px;overflow:hidden"></div>
             <div class="knowledge-panel" style="margin-top:1rem">
                 <h4><i data-lucide="book-open" style="width:14px;height:14px"></i>Theory: Structural Biology</h4>
-                <p>Co-crystal structures reveal experimentally-determined binding modes. A₂A receptor (PDB: 6GDG) resolved to 2.6 Å with selective agonists. Structures validate computational docking and identify key pharmacophoric interactions.</p>
+                <p>Co-crystal structures reveal experimentally-determined binding modes. A₂A receptor (PDB: 6GDG) resolved to 2.6 Å with selective agonists. Each neighbor links to its real deposited structure (PDB/ChEMBL) — no generated conformers are presented as real.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ PROVENANCE FOOTER ═══ -->
+    <div class="full-section section-theme-dark">
+        <div class="section-inner">
+            <div class="section-num">08</div>
+            <div class="section-title" style="color:#94a3b8">Provenance & Trust</div>
+            <div class="section-subtitle">Exactly which data and models produced this prediction</div>
+            <div class="card dark-card" style="margin:0">
+                ${(() => {
+                    const p = data.provenance || {};
+                    if (!p || !p.run_id) return '<p style="color:var(--text-muted);font-size:0.78rem">Provenance unavailable.</p>';
+                    const rows = [
+                        ['Model Run ID', p.run_id],
+                        ['Data fingerprint', p.data_fingerprint],
+                        ['Model fingerprint', p.model_fingerprint],
+                        ['Training records', String(p.train_records)],
+                        ['Targets', (p.subtypes || []).join(', ')],
+                        ['Min ChEMBL confidence', p.assay_quality_gates && p.assay_quality_gates.min_chembl_confidence],
+                        ['Standard assay types', p.assay_quality_gates && (p.assay_quality_gates.standard_types || []).join(', ')],
+                    ];
+                    return rows.map(([k, v]) => `<div class="feat-row" style="border-bottom:1px solid rgba(148,163,184,0.12)"><span style="color:var(--text-muted)">${k}</span><strong style="font-family:monospace;font-size:0.72rem">${v || '—'}</strong></div>`).join('');
+                })()}
+                <div class="metric-sub" style="margin-top:0.6rem">Fingerprints are SHA-256 hashes of the exact data/model files used. Run ID is regenerated per server session. Re-run the pipeline to reproduce these hashes on demand.</div>
             </div>
         </div>
     </div>`;
@@ -869,7 +955,7 @@ function renderSingleResults(data, target) {
         }
         box.innerHTML = `<div class="table-wrap">
             <table>
-                <thead><tr><th>#</th><th>SMILES</th><th>Tanimoto</th><th>pChEMBL</th><th>Activity</th><th>PDB / 3D Structure</th></tr></thead>
+                <thead><tr><th>#</th><th>SMILES</th><th>Tanimoto</th><th>pChEMBL</th><th>Activity</th><th>Real Structure (PDB / ChEMBL)</th></tr></thead>
                 <tbody>${nbrs.map((n, i) => `
                     <tr>
                         <td>${i + 1}</td>
@@ -877,7 +963,7 @@ function renderSingleResults(data, target) {
                         <td><span class="badge badge-${n.tanimoto >= 0.7 ? 'green' : n.tanimoto >= 0.4 ? 'amber' : 'red'}">${n.similarity_label}</span></td>
                         <td><strong>${n.pchembl}</strong></td>
                         <td><span class="badge badge-${n.pchembl >= 6 ? 'green' : n.pchembl >= 4.5 ? 'amber' : 'red'}">${n.activity}</span></td>
-                        <td>${pdb3dCell(n.smiles, n.pdb_entries)}</td>
+<td>${realStructCell(n.real_structures || (n.pdb_entries || []).map(p => ({ type: 'pdb', id: p.pdb_id, name: p.name })))}</td>
                     </tr>`).join('')}
                 </tbody>
             </table>
@@ -897,7 +983,7 @@ function renderSingleResults(data, target) {
     // Real co-crystal complex viewer (RCSB download)
     const complexViewer = container.querySelector('#complex-viewer');
     const rcsbSlot = container.querySelector('#rcsb-download-slot');
-    function setRcsbDownload(pdbId) {
+    function setRcsbDownload(pdbId, title) {
         if (!rcsbSlot) return;
         rcsbSlot.innerHTML = pdbId
             ? `<a class="btn" style="padding:0.3rem 0.8rem;font-size:0.75rem" href="https://files.rcsb.org/download/${pdbId}.pdb" target="_blank" rel="noopener"><i class="tab-ico" data-lucide="download"></i>Download PDB: ${pdbId}</a>`
@@ -907,6 +993,16 @@ function renderSingleResults(data, target) {
         container.querySelectorAll('.pdb-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         const pdbId = btn.getAttribute('data-pdb');
+        const title = btn.getAttribute('data-title') || '';
+        // Show ligand context above the viewer
+        let cap = container.querySelector('#complex-legend');
+        if (!cap && complexViewer) {
+            cap = document.createElement('div');
+            cap.id = 'complex-legend';
+            cap.style.cssText = 'margin:0.4rem 0;font-size:0.72rem;color:#94a3b8';
+            complexViewer.parentNode.insertBefore(cap, complexViewer);
+        }
+        if (cap) cap.innerHTML = title ? `<b style="color:#e2e8f0">${pdbId}</b> — ${title}` : '';
         setRcsbDownload(pdbId);
         if (complexViewer && pdbId) loadPdbComplex(pdbId, complexViewer);
     }

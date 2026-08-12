@@ -73,9 +73,27 @@ def _load_scaler(mode: str = "precise"):
 
 @lru_cache(maxsize=1)
 def _load_db_lookup():
-    p = PROCESSED_DATA_DIR / "db_lookup_train.json"
+    # Prefer the FULL database (all curated molecules incl. held-out test set),
+    # so known compounds like adenosine show their true measured pChEMBL instead
+    # of being treated as unknown "model-only" inputs.
+    for name in ("db_lookup.json", "db_lookup_train.json"):
+        p = PROCESSED_DATA_DIR / name
+        if p.exists():
+            with open(p, encoding="utf-8") as f:
+                lookup = json.load(f)
+            if name == "db_lookup.json":
+                # fall back to train lookup when full DB missing
+                return lookup or _load_train_only_lookup()
+            return lookup
+    return {}
+
+
+@lru_cache(maxsize=1)
+def _load_train_only_lookup():
+    from src.config import PROCESSED_DATA_DIR as _DIR
+    p = _DIR / "db_lookup_train.json"
     if p.exists():
-        with open(p) as f:
+        with open(p, encoding="utf-8") as f:
             return json.load(f)
     return {}
 
@@ -220,19 +238,12 @@ def _ensemble_predict(model_ens, x: np.ndarray) -> Tuple[Any, Any, Any, Any]:
 _ZERO_RESULT = (0.0, 0.0, {"lower": 0.0, "upper": 0.0, "width": 0.0})
 
 
-def _predict_one_model(model_dict, x, in_db, lookup, canon, st):
-    """Predict with one model type for one subtype. Returns (pred, unc, interval).
-
-    For database hits: return experimental value with σ=0 (no prediction uncertainty).
-    For novel compounds: return model prediction with conformal interval.
-    """
-    # DB hits take priority — experimental value, zero uncertainty
-    if in_db and isinstance(lookup.get(canon), dict):
-        val = lookup[canon].get(st)
-        if pd.notna(val) and str(val).lower() != 'nan':
-            p_val = float(val)
-            return p_val, 0.0, {"lower": p_val, "upper": p_val, "width": 0.0}
-    # Model prediction with conformal intervals
+def _predict_one_model(model_dict, x, st):
+    """Predict with one model type for one subtype. Always returns the model's own
+    prediction with its conformal interval. (Historically this echoed the stored
+    experimental value with zero uncertainty for database hits, which made four
+    independent models appear to agree perfectly — misleading. We keep predictions
+    honest and expose measured values separately via `db_value`.)"""
     if st in model_dict and x is not None:
         m, s, low, high = _ensemble_predict(model_dict[st], x)
         return m, s, {"lower": round(low, 3), "upper": round(high, 3), "width": round(high - low, 3)}
@@ -287,38 +298,29 @@ def predict(smiles: str, threshold: float = 6.0, run_rf: bool = True) -> Dict[st
 
     for st in SUBTYPES:
         for mod_name, mod_dict in base_model_map.items():
-            p, u, iv = _predict_one_model(mod_dict, x, in_db, lookup, canon, st)
+            p, u, iv = _predict_one_model(mod_dict, x, st)
             preds[mod_name][st] = p
             unc[mod_name][st] = u
             intervals[mod_name][st] = iv
 
-        # --- Stacked ensemble ---
-        if in_db and isinstance(lookup.get(canon), dict):
-            val = lookup[canon].get(st)
-            p_val = float(val) if (pd.notna(val) and str(val).lower() != 'nan') else 0.0
-            preds["Stacked"][st] = p_val
-            unc["Stacked"][st] = 0.0
-
-            intervals["Stacked"][st] = {"lower": p_val, "upper": p_val, "width": 0.0}
-        else:
-            # Exclude zero or missing base model predictions from Stacked ensemble mean
-            valid_base_vals = [
-                preds[mod_name].get(st, 0.0) 
-                for mod_name in ("XGBoost", "RandomForest", "LightGBM") 
-                if isinstance(preds[mod_name].get(st, 0.0), (int, float)) and preds[mod_name].get(st, 0.0) > 0
-            ]
-            if st in stack_models and x is not None and len(valid_base_vals) == 3:
-                try:
-                    meta_x = np.array([valid_base_vals])
-                    m = float(stack_models[st].predict(meta_x)[0])
-                except Exception:
-                    m = float(np.mean(valid_base_vals)) if valid_base_vals else 0.0
-            else:
+        # --- Stacked ensemble (equal-weight mean of available base predictions) ---
+        valid_base_vals = [
+            preds[mod_name].get(st, 0.0) 
+            for mod_name in ("XGBoost", "RandomForest", "LightGBM") 
+            if isinstance(preds[mod_name].get(st, 0.0), (int, float)) and preds[mod_name].get(st, 0.0) > 0
+        ]
+        if st in stack_models and x is not None and len(valid_base_vals) == 3:
+            try:
+                meta_x = np.array([valid_base_vals])
+                m = float(stack_models[st].predict(meta_x)[0])
+            except Exception:
                 m = float(np.mean(valid_base_vals)) if valid_base_vals else 0.0
+        else:
+            m = float(np.mean(valid_base_vals)) if valid_base_vals else 0.0
 
-            preds["Stacked"][st] = round(m, 3)
-            unc["Stacked"][st] = 0.0
-            intervals["Stacked"][st] = {"lower": round(m, 3), "upper": round(m, 3), "width": 0.0}
+        preds["Stacked"][st] = round(m, 3)
+        unc["Stacked"][st] = 0.0
+        intervals["Stacked"][st] = {"lower": round(m, 3), "upper": round(m, 3), "width": 0.0}
 
         # --- PyTorch / GNN ---
         pred_val = _try_gnn_predict(canon, st)
@@ -343,9 +345,21 @@ def predict(smiles: str, threshold: float = 6.0, run_rf: bool = True) -> Dict[st
 
     ref_preds = preds["XGBoost"]
 
+    db_exp = None
+    if in_db and isinstance(lookup.get(canon), dict):
+        db_exp = {}
+        for st in SUBTYPES:
+            v = lookup[canon].get(st)
+            try:
+                fv = float(v)
+                db_exp[st] = round(fv, 3) if pd.notna(fv) and str(v).lower() != "nan" else None
+            except (TypeError, ValueError):
+                db_exp[st] = None
+
     return {
         "smiles": canon,
         "in_database": in_db,
+        "db_value": db_exp,
         "predictions": preds,
         "descriptors": desc_results,
         "uncertainty": unc,

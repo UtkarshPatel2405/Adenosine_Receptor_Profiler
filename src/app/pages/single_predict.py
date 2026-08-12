@@ -1,4 +1,4 @@
-# src/app/pages/single_predict.py
+﻿# src/app/pages/single_predict.py
 """Single molecule prediction — SMILES input only, all original features."""
 import streamlit as st
 import pandas as pd
@@ -9,7 +9,6 @@ from datetime import datetime
 from src.config import SUBTYPES
 from src.predictor import predict
 from src.chem_utils import topk_tanimoto, draw_2d_svg, generate_3d_conformer, generate_pdb_block, check_pains, qed_profile, nearest_tanimoto
-from src.app.components.docking_panel import render_docking_panel
 from src.pdb_utils import search_pdb_for_smiles_batch
 
 EXAMPLES = {
@@ -81,6 +80,8 @@ def _run_prediction(smi, run_rf=False):
     el = time.time() - t0
     r["_elapsed"] = el; r["_mol_block"] = mb; r["_svg"] = sv; r["_smiles"] = smi
     r["_profile"] = qed_profile(smi)
+    ad_sim = nearest_tanimoto(r["smiles"])
+    r["_admitted"] = bool(ad_sim is not None and ad_sim >= 0.4)
     st.session_state.pred = r
     xgb_best = r["predictions"]["XGBoost"].get(r["best_target"], 0)
     st.session_state.history.append({
@@ -268,6 +269,34 @@ def render_single_predict():
         f'<span class="anim-in-d2" style="font-size:.65rem;color:#64748b;margin-left:auto">{canon[:50]}{".." if len(canon)>50 else ""}</span>'
         f'</div>', unsafe_allow_html=True)
 
+    admitted = bool(r.get("_admitted"))
+    if not admitted:
+        al = check_pains(canon)
+        pains_badge = "badge badge-red" if al else "badge badge-green"
+        pains_label = f"{len(al)} PAINS alerts" if al else "No PAINS"
+        sim = nearest_tanimoto(canon)
+        st.markdown(
+            '<div class="ad-warning-box-oi">'
+            '<b style="color:#f87171">⚠ Out of Model Scope — quantitative predictions withheld.</b><br>'
+            f'<span style="color:#cbd5e1">This molecule shares almost nothing with the adenosine-ligand training set '
+            f'(nearest Tanimoto = {sim:.3f} &lt; 0.4), so pChEMBL / selectivity / SHAP would be unvalidated extrapolations. '
+            'See the neighbors table below for real measured activities of the closest deposited structures.</span>'
+            '</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header">⚗️ Chemical Property Alerts</div>', unsafe_allow_html=True)
+        ca, cb = st.columns(2)
+        with ca:
+            st.markdown(f'<div class="card" style="text-align:center;padding:.4rem .5rem">'
+                f'<div style="font-size:.6rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem">PAINS Filter</div>'
+                f'<span class="{pains_badge}">{pains_label}</span>'
+                f'</div>', unsafe_allow_html=True)
+        with cb:
+            st.markdown(f'<div class="card" style="text-align:center;padding:.4rem .5rem">'
+                f'<div style="font-size:.6rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem">Nearest Training Similarity</div>'
+                f'<span class="badge badge-red">Outside AD ({sim:.3f})</span>'
+                f'</div>', unsafe_allow_html=True)
+        _render_similarity_panel(canon)
+        st.stop()
+
     # ── Feature type explanations ──
     with st.expander("🧩 What features does the model use?", expanded=False):
         st.markdown('<div class="section-header">Feature Engineering</div>', unsafe_allow_html=True)
@@ -380,8 +409,10 @@ def render_single_predict():
                 key="download_comparison_csv",
                 use_container_width=True,
             )
-            if r["source"] == "database":
-                st.caption("Database hit — all models show experimental values.")
+            if r["in_database"]:
+                dbv = r.get("db_value") or {}
+                db_txt = ", ".join(f"{st}={dbv.get(st):.2f}" for st in ("A1", "A2A", "A2B", "A3") if isinstance(dbv.get(st), (int, float)))
+                st.caption(f"Database hit — measured (experimental) pChEMBL: {db_txt}. Model predictions above are shown for reference and may differ from the measured values.")
             _render_uncertainty_explanation(r)
 
     # ── SHAP Feature Attribution ──
@@ -408,9 +439,7 @@ def render_single_predict():
             with s_cols[idx]:
                 st.markdown(f'<div class="card" style="text-align:center;padding:.3rem .5rem"><div class="section-header" style="font-size:.6rem;justify-content:center">{k2.replace("_vs_"," vs ")}</div><span style="font-size:1rem;font-weight:700">{v2:.3f}</span></div>', unsafe_allow_html=True)
 
-    render_docking_panel(canon, r.get("best_target", "A2A"))
-
-    # ── Safety / AD / Drug-likeness Alerts ──
+# ── Safety / AD / Drug-likeness Alerts ──
     st.markdown('<div class="sd"></div>', unsafe_allow_html=True)
     st.markdown(f'<div class="section-header">⚗️ Drug-likeness & Applicability Alerts</div>', unsafe_allow_html=True)
     ca, cb, cc = st.columns(3)
@@ -449,10 +478,9 @@ def render_single_predict():
         _render_similarity_panel(canon)
 
 def _render_similarity_panel(canon):
-    """Top-10 neighbors with PDB lookup and 3D PDB/SDF conformer downloads in structured table."""
-    from src.chem_utils import topk_tanimoto, generate_pdb_block, generate_sdf_block
-    from src.pdb_utils import get_pdb_ids_for_smiles
-    import base64
+    """Top-10 neighbors with real deposited PDB / ChEMBL structure links in structured table."""
+    from src.chem_utils import topk_tanimoto
+    from src.pdb_utils import real_structure_refs_with_analogs
 
     @st.cache_data(show_spinner=False)
     def _cached_tanimoto(smiles):
@@ -470,29 +498,23 @@ def _render_similarity_panel(canon):
                 else:
                     sim_label = f'<span class="badge badge-red">Low ({t:.3f})</span>'
 
-                pdbs = get_pdb_ids_for_smiles(s)
-                if pdbs:
-                    pdb_links = " ".join(
-                        f'<a href="{p["url"]}" target="_blank" class="badge badge-blue" title="{p.get("name", p["pdb_id"])}">{p["pdb_id"]}</a>'
-                        for p in pdbs[:3]
-                    )
+                refs = real_structure_refs_with_analogs(s)
+                if refs:
+                    links = []
+                    for r in refs:
+                        cls = "badge-blue" if r["type"] == "pdb" else "badge-purple"
+                        label = r["id"]
+                        title = r.get("name", r["id"])
+                        links.append(f'<a href="{r["url"]}" target="_blank" class="badge {cls}" title="{title}">{label}</a>')
+                    pdb_links = " ".join(links)
                 else:
-                    gen_links = []
-                    pdb_text = generate_pdb_block(s)
-                    if pdb_text:
-                        pdb_b64 = base64.b64encode(pdb_text.encode('utf-8')).decode('utf-8')
-                        gen_links.append(f'<a href="data:chemical/x-pdb;base64,{pdb_b64}" download="neighbor_{i}_3d.pdb" class="badge badge-cyan" title="Download generated 3D PDB conformer">📥 3D PDB</a>')
-                    sdf_text = generate_sdf_block(s)
-                    if sdf_text:
-                        sdf_b64 = base64.b64encode(sdf_text.encode('utf-8')).decode('utf-8')
-                        gen_links.append(f'<a href="data:chemical/x-mdl-sdfile;base64,{sdf_b64}" download="neighbor_{i}_3d.sdf" class="badge badge-purple" title="Download generated 3D SDF conformer">📥 3D SDF</a>')
-                    pdb_links = " ".join(gen_links) if gen_links else '<span style="color:#64748b;font-size:.65rem">—</span>'
+                    pdb_links = '<span style="color:#64748b;font-size:.65rem" title="No deposited structure in PDB or ChEMBL">No real structure</span>'
 
                 rows.append({
                     "#": i,
                     "SMILES": f'<span title="{s}" style="display:inline-block;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;font-family:monospace;font-size:.68rem;color:#e2e8f0">{s}</span>',
                     "Tanimoto": sim_label,
-                    "PDB / 3D Structure": pdb_links,
+                    "Real Structure (PDB / ChEMBL)": pdb_links,
                 })
 
             df = pd.DataFrame(rows)
