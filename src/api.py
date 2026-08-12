@@ -40,9 +40,4 @@ def health_check():
     return {"status": "ok", "version": "2.0.0"}
 
 
-@app.get("/")
-def read_root():
-    index_path = STATIC_DIR / "index.html"
-    if index_path.exists():
-        return FileResponse(index_path)
-    return {"message": "Adenosine Selectivity Model API active. Access /docs for API documentation."}
+
