@@ -22,9 +22,10 @@ demo = gr.Interface(
     title="Adeno Advance API Backend"
 )
 
-# 3. Mount Gradio onto the FastAPI application at "/gradio"
-# This keeps your FastAPI endpoints at the root "/" and mounts the Gradio interface at "/gradio"
-app = gr.mount_gradio_app(fastapi_app, demo, path="/gradio")
+# 3. Mount Gradio onto the FastAPI application at "/"
+# This serves the Gradio UI at the root "/" (satisfying Hugging Face checks)
+# while preserving all your FastAPI routes (like /api/predict/single)
+app = gr.mount_gradio_app(fastapi_app, demo, path="/")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
