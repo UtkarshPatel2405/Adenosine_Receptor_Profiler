@@ -57,7 +57,15 @@ class SinglePredictRequest(BaseModel):
     run_rf: Optional[bool] = True
 
 
+try:
+    import spaces
+    gpu_decorator = spaces.GPU
+except ImportError:
+    def gpu_decorator(func):
+        return func
+
 @router.post("/single")
+@gpu_decorator
 def predict_single(req: SinglePredictRequest):
     smiles_input = req.smiles.strip()
     if not smiles_input:
