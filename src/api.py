@@ -24,6 +24,17 @@ from src.api_routes.model_results import router as model_results_router
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("src.api")
 
+# Pre-load all machine learning models into memory during container boot to avoid cold-start timeouts
+try:
+    from src.predictor import _load_models, _load_db_lookup
+    logger.info("Pre-loading QSAR models into memory on startup...")
+    _load_db_lookup()
+    for prefix in ("xgboost", "rf", "lgb", "stack_ridge"):
+        _load_models(prefix)
+    logger.info("All QSAR models pre-loaded successfully!")
+except Exception as e:
+    logger.error("Failed to pre-load models: %s", e)
+
 app = FastAPI(
     title="Adenosine Receptor Selectivity Predictor API",
     description="Publication-grade QSAR platform with MAPIE conformal prediction & multi-model ensembles",
