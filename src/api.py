@@ -1,9 +1,21 @@
 import logging
+import sys
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+
+# Mock spaces module locally to allow literal @spaces.GPU decorators in routes
+try:
+    import spaces
+except ImportError:
+    import types
+    mock_spaces = types.ModuleType("spaces")
+    def dummy_gpu(func):
+        return func
+    mock_spaces.GPU = dummy_gpu
+    sys.modules["spaces"] = mock_spaces
 
 from src.api_routes.single import router as single_router
 from src.api_routes.batch import router as batch_router
