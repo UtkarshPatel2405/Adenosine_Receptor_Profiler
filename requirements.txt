@@ -21,4 +21,5 @@ openpyxl>=3.1,<4.0
 fastapi>=0.110.0,<1.0
 uvicorn>=0.28.0,<1.0
 python-multipart>=0.0.9
+huggingface-hub==0.22.2
 
