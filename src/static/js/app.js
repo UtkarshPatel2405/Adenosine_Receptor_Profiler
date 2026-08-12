@@ -1,4 +1,8 @@
-﻿document.addEventListener('DOMContentLoaded', () => {
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? '' 
+    : 'https://utkarsh2405-adeno-advance.hf.space';
+
+document.addEventListener('DOMContentLoaded', () => {
     if (window.lucide) {
         lucide.createIcons();
         // Auto-compile icons injected later. Guard: only react to <i> placeholders,
@@ -252,7 +256,7 @@ async function runExampleAnalysis(smiles) {
     panel.innerHTML = `<div class="card" style="text-align:center;padding:2rem;"><span class="badge badge-cyan">Running full pipeline for SMILES — affinity grid, SHAP, neighbors, 3D…</span></div>`;
 
     try {
-        const res = await fetch('/api/predict/single', {
+        const res = await fetch(`${API_BASE_URL}/api/predict/single`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ smiles, threshold: 6.0, run_rf: true })
@@ -287,7 +291,7 @@ async function runSinglePredict(smiles) {
         </div>`;
 
     try {
-        const res = await fetch('/api/predict/single', {
+        const res = await fetch(`${API_BASE_URL}/api/predict/single`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ smiles: smiles, threshold: 6.0, run_rf: true })
@@ -1146,7 +1150,7 @@ async function uploadBatchFile(file) {
     formData.append('file', file);
 
     try {
-        const res = await fetch('/api/predict/batch', { method: 'POST', body: formData });
+        const res = await fetch(`${API_BASE_URL}/api/predict/batch`, { method: 'POST', body: formData });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Batch processing failed');
 
@@ -1239,7 +1243,7 @@ async function loadModelResults() {
     resultsCharts = [];
 
     try {
-        const res = await fetch('/api/model_results');
+        const res = await fetch(`${API_BASE_URL}/api/model_results`);
         const data = await res.json();
         if (!res.ok) return;
 
@@ -1346,7 +1350,7 @@ async function loadModelResults() {
             const barPh = document.getElementById('shap-bar-placeholder');
             if (barImg) {
                 barImg.style.display = 'none';
-                barImg.src = `/api/plot/shap/${subtype}_bar.png`;
+                barImg.src = `${API_BASE_URL}/api/plot/shap/${subtype}_bar.png`;
                 barImg.onload = () => { barImg.style.display = 'block'; if (barPh) barPh.style.display = 'none'; };
                 barImg.onerror = () => { barImg.style.display = 'none'; if (barPh) { barPh.style.display = 'block'; barPh.textContent = 'Plot not available'; } };
             }
@@ -1356,7 +1360,7 @@ async function loadModelResults() {
             const beePh = document.getElementById('shap-bee-placeholder');
             if (beeImg) {
                 beeImg.style.display = 'none';
-                beeImg.src = `/api/plot/shap/${subtype}_beeswarm.png`;
+                beeImg.src = `${API_BASE_URL}/api/plot/shap/${subtype}_beeswarm.png`;
                 beeImg.onload = () => { beeImg.style.display = 'block'; if (beePh) beePh.style.display = 'none'; };
                 beeImg.onerror = () => { beeImg.style.display = 'none'; if (beePh) { beePh.style.display = 'block'; beePh.textContent = 'Plot not available'; } };
             }
@@ -1373,7 +1377,7 @@ async function loadModelResults() {
             const distPh = document.getElementById('yrand-dist-placeholder');
             if (distImg) {
                 distImg.style.display = 'none';
-                distImg.src = `/api/plot/y_randomization/${subtype}_distribution.png`;
+                distImg.src = `${API_BASE_URL}/api/plot/y_randomization/${subtype}_distribution.png`;
                 distImg.onload = () => { distImg.style.display = 'block'; if (distPh) distPh.style.display = 'none'; };
                 distImg.onerror = () => { distImg.style.display = 'none'; if (distPh) { distPh.style.display = 'block'; distPh.textContent = 'Plot not available'; } };
             }
@@ -1429,7 +1433,7 @@ async function loadModelResults() {
             if (pImg) {
                 const pKey = target === 'Combined' ? 'combined' : target.toLowerCase();
                 pImg.style.display = 'none';
-                pImg.src = `/api/plot/diagnostics/${pKey}_pchembl_distribution.png`;
+                pImg.src = `${API_BASE_URL}/api/plot/diagnostics/${pKey}_pchembl_distribution.png`;
                 pImg.onload = () => { pImg.style.display = 'block'; if (pPh) pPh.style.display = 'none'; };
                 pImg.onerror = () => { pImg.style.display = 'none'; if (pPh) { pPh.style.display = 'block'; pPh.textContent = 'Plot not available'; } };
             }
@@ -1443,7 +1447,7 @@ async function loadModelResults() {
                     if (cPh) { cPh.style.display = 'block'; cPh.textContent = 'Combined cliffs plot not available — select a subtype'; }
                 } else {
                     cImg.style.display = 'none';
-                    cImg.src = `/api/plot/diagnostics/${target.toLowerCase()}_activity_cliffs_shifts.png`;
+                    cImg.src = `${API_BASE_URL}/api/plot/diagnostics/${target.toLowerCase()}_activity_cliffs_shifts.png`;
                     cImg.onload = () => { cImg.style.display = 'block'; if (cPh) cPh.style.display = 'none'; };
                     cImg.onerror = () => { cImg.style.display = 'none'; if (cPh) { cPh.style.display = 'block'; cPh.textContent = 'Plot not available'; } };
                 }
