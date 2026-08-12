@@ -1,8 +1,0 @@
-{
-  "cleanUrls": true,
-  "rewrites": [
-    { "source": "/static/(.*)", "destination": "/src/static/$1" },
-    { "source": "/", "destination": "/src/static/index.html" },
-    { "source": "/(.*)", "destination": "/src/static/$1" }
-  ]
-}
