@@ -10,8 +10,8 @@ This guide walks you through deploying the **Adeno_Advance** FastAPI + HTML/JS a
 3. Fill in the following details:
    * **Space Name**: `Adeno_Advance` (or any name you prefer)
    * **License**: `mit` (or leave blank)
-   * **SDK**: Select **Docker** (Crucial: do not select Streamlit or Gradio)
-   * **Docker Template**: Select **Blank** (do not select any pre-configured template)
+   * **SDK**: Select **Gradio** (This is 100% Free! Even though it is labeled Gradio, our root `app.py` will route traffic to your FastAPI server).
+   * **Gradio Template**: Select **Blank** (do not select chatbot, text-to-image, etc.)
    * **Space Hardware**: **CPU basic** (Free, 16GB RAM)
    * **Visibility**: **Public** (or Private if you prefer)
 4. Click **Create Space**.
