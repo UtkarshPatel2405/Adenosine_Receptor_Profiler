@@ -9,6 +9,7 @@ import csv
 import io
 import json
 import logging
+import random
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -20,6 +21,20 @@ import streamlit.components.v1 as components
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("streamlit_app")
+
+# ponytail: static pickup lines, one random pick per load; no rotating carousel (threading is fragile in Streamlit)
+LOADING_LINES = [
+    "Caffeine molecules are currently fighting for your receptors. Please wait.",
+    "The server is taking a coffee break. Literally. It runs on adenosine inhibitors.",
+    "Brewing predictions. Higher quality than your lab's breakroom coffee.",
+    "Warning: This algorithm is more heavily caffeinated than the developer.",
+    "Our models are currently blocking their own A2A receptors to work faster.",
+    "Calculating results at the speed of a post-coffee morning crush.",
+    "In silico profiling: Because waiting for assays requires too many espresso shots.",
+    "Giving the models a shot of espresso so they finally agree on the pChEMBL value.",
+    "We are keeping your adenosine receptors occupied so you don't notice the wait.",
+    "Extracting data. Please ensure your own personal caffeine levels are topped up.",
+]
 
 # Page Configuration
 st.set_page_config(
@@ -1402,7 +1417,7 @@ with tab_single:
     # after an explicit request, then the cached report survives tab changes.
     data = st.session_state.get("last_prediction")
     if predict_btn and smiles_query.strip():
-        with st.spinner("Executing multi-model inference & conformal uncertainty calculations..."):
+        with st.spinner(random.choice(LOADING_LINES)):
             try:
                 data = execute_single_prediction(smiles_query, threshold=ACTIVITY_THRESHOLD, run_rf=RUN_RF)
             except Exception as e:
@@ -1526,7 +1541,7 @@ with tab_batch:
             lines = [l.strip() for l in batch_text.strip().split("\n") if l.strip()]
 
         if lines:
-            with st.spinner(f"Scoring {len(lines)} candidate molecules across all subtypes..."):
+            with st.spinner(f"{random.choice(LOADING_LINES)} ({len(lines)} molecules queued)"):
                 from src.predictor import predict
                 from src.chem_utils import canonicalize_smiles, nearest_tanimoto
                 
