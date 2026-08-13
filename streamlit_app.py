@@ -1813,8 +1813,8 @@ def _bm_ext(bm):
         insuff = m.get("insufficient_data", False)
         rows.append({
             "Subtype": f"{sn} Receptor", "n": m.get("n", 0),
-            "R²": "—" if insuff else round(m.get("r2", 0), 3),
-            "MAE": "—" if insuff else round(m.get("mae", 0), 3),
+            "R²": "—" if insuff else f"{m.get('r2', 0):.3f}",
+            "MAE": "—" if insuff else f"{m.get('mae', 0):.3f}",
         })
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
@@ -1827,8 +1827,8 @@ def _bm_bench(bm):
         row = {"Method": model, "Split": info.get("split", "")}
         for s in _SUBS:
             mv = m.get(s, {})
-            row[f"{s} R²"] = round(mv.get("r2", 0), 3) if mv.get("r2") is not None else "—"
-            row[f"{s} MAE"] = round(mv.get("mae", 0), 3) if mv.get("mae") is not None else "—"
+            row[f"{s} R²"] = "—" if mv.get("r2") is None else f"{mv.get('r2', 0):.3f}"
+            row[f"{s} MAE"] = "—" if mv.get("mae") is None else f"{mv.get('mae', 0):.3f}"
         rows.append(row)
     if rows:
         st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
