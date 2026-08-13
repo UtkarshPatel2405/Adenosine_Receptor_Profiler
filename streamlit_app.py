@@ -15,7 +15,6 @@ from typing import Dict, Any, Optional
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -919,7 +918,7 @@ def _tab_structure(data):
     with col_v3d:
         st.markdown("<div style='font-size:0.8rem;font-weight:600;color:#c8d0d6;margin-bottom:0.4rem'>3D MMFF94 Conformer (3Dmol.js)</div>", unsafe_allow_html=True)
         if data.get("mol_block_3d"):
-            components.html(render_3dmol_conformer(data["mol_block_3d"]), height=390)
+            st.html(render_3dmol_conformer(data["mol_block_3d"]), unsafe_allow_javascript=True)
         else:
             st.info("3D conformer unavailable.")
 
@@ -1275,7 +1274,7 @@ def _tab_structural(data):
             <span class="badge-pill badge-cyan">PDB: <b>{current_pdb_id}</b> ({current_pdb_meta['resolution']})</span>
         </div>
         """, unsafe_allow_html=True)
-        components.html(render_3dmol_complex(current_pdb_id), height=430)
+        st.html(render_3dmol_complex(current_pdb_id), unsafe_allow_javascript=True)
         st.markdown(f"""
         <div style="font-size:0.75rem;color:#9aa7af;margin-top:0.4rem;display:flex;justify-content:space-between">
             <span><b style="color:#c4b5fd">● Purple Sticks:</b> Co-crystallized ligand ({current_pdb_meta['ccd']})</span>
@@ -1363,6 +1362,11 @@ with tab_single:
         if compound_name != "Custom molecule":
             st.session_state.smiles_query = PRESET_BY_NAME[compound_name]["smiles"]
 
+    def _on_smiles_edit():
+        # User typed their own molecule: drop any selected reference preset.
+        # (Programmatic session-state writes never trigger this callback.)
+        st.session_state.reference_compound = "Custom molecule"
+
     # Input Area with curated reference compounds
     col_inp, col_presets = st.columns([3, 2])
     with col_inp:
@@ -1371,6 +1375,7 @@ with tab_single:
             placeholder="e.g. Nc1ncnc2n(cnc12)[C@@H]3O[C@H](CO)[C@@H](O)[C@H]3O or 6GDG",
             help="Supports Canonical SMILES, isomeric SMILES, or RCSB PDB ID.",
             key="smiles_query",
+            on_change=_on_smiles_edit,
         )
     with col_presets:
         selected_compound = st.selectbox(
@@ -1922,10 +1927,10 @@ with tab_library:
         st.markdown("""<h3 class="page-title" style="color:var(--green)"><span class="material-symbols-outlined">radio_button_checked</span>Active Signaling Conformations (Agonist-Bound)</h3>""", unsafe_allow_html=True)
         act_sel = st.selectbox("Active Structure", ["A2A: 6GDG (2.6 Å, Adenosine)", "A1: 6D9H (3.6 Å, Adenosine)", "A2B: 6LPJ (3.2 Å, BAY 60-6583)", "A3: 7VAK (3.0 Å, IB-MECA)"], key="g_act")
         pdb_act = act_sel.split(":")[1].split("(")[0].strip()
-        components.html(render_3dmol_complex(pdb_act), height=400)
+        st.html(render_3dmol_complex(pdb_act), unsafe_allow_javascript=True)
         
     with g_col2:
         st.markdown("""<h3 class="page-title" style="color:var(--red)"><span class="material-symbols-outlined">pause_circle</span>Inactive Ground State Conformations (Antagonist-Bound)</h3>""", unsafe_allow_html=True)
         inact_sel = st.selectbox("Inactive Structure", ["A2A: 4EIY (1.8 Å, ZM241385)", "A1: 5N2S (3.3 Å, DU172)", "A2B: 8JZX (3.1 Å, PSB-603)", "A3: 8HN0 (3.2 Å, PSB-11)"], key="g_inact")
         pdb_inact = inact_sel.split(":")[1].split("(")[0].strip()
-        components.html(render_3dmol_complex(pdb_inact), height=400)
+        st.html(render_3dmol_complex(pdb_inact), unsafe_allow_javascript=True)
