@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from rdkit import Chem
 
-from src.smiles_registry import SmilesRegistry
+from src.chem_utils import canonicalize
 from src.chem_utils import canonicalize as _canonicalize_smiles
 from src.config import (
     RAW_DATA_DIR, PROCESSED_DATA_DIR, SUBTYPES, VALID_STANDARD_TYPES,
@@ -150,11 +150,9 @@ def load_and_clean(
             known_targets[smi] = set()
         known_targets[smi].update(subtypes)
 
-    registry = SmilesRegistry()
-
     barcodes = []
     for smi in df["canonical_smiles"]:
-        barcode, is_new = registry.register(smi)
+        barcode = canonicalize(smi)
         barcodes.append(barcode)
     df["barcode"] = barcodes
 
@@ -226,8 +224,7 @@ def load_and_clean(
                 .to_dict()
             )
 
-    registry.save()
-    logger.info("SMILES barcode registry saved (%d molecules).", len(registry))
+
 
     Path(save_lookup_path).parent.mkdir(parents=True, exist_ok=True)
     with open(save_lookup_path, "w", encoding="utf-8") as f:

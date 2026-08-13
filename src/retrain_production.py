@@ -20,14 +20,14 @@ class AverageEnsemble:
 
 from src.data_loader import load_and_clean
 from src.features import build_feature_matrix, build_features
-from src.conformal import train_conformal_model
 from src.scaffold_split import split_smiles_globally
-from src.smiles_registry import SmilesRegistry
+
 from src.config import (
     SUBTYPES, MODELS_DIR, PROCESSED_DATA_DIR, OUTPUTS_DIR,
     SCAFFOLD_SPLIT_SEED, SCAFFOLD_TEST_SIZE, RF_N_ESTIMATORS,
-    RF_MAX_DEPTH, RF_MAX_FEATURES, MAPIE_CV_FOLDS, LOG_LEVEL, RUN_ID,
+    RF_MAX_DEPTH, RF_MAX_FEATURES, MAPIE_CV_FOLDS, MAPIE_CONFIDENCE, LOG_LEVEL, RUN_ID,
 )
+from mapie.regression import CrossConformalRegressor
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,17 @@ LGBM_DEFAULT_PARAMS = {
            "reg_alpha": 0.05, "reg_lambda": 1.0},
 }
 
+def train_conformal_model(base_model, X_train, y_train, cv):
+    mapie = CrossConformalRegressor(
+        estimator=base_model,
+        cv=cv,
+        confidence_level=MAPIE_CONFIDENCE,
+        method="plus",
+        n_jobs=1,
+    )
+    mapie.fit_conformalize(X_train, y_train)
+    logger.info("Conformal model trained: cv=%d, confidence=%.2f", cv, MAPIE_CONFIDENCE)
+    return mapie
 
 def _run_optuna_hpo(X_tr, y_tr, smiles_tr, subtype: str, n_trials: int = 30) -> dict:
     """
@@ -141,7 +152,7 @@ def retrain_production_models(data_path: str = "data/raw"):
     logger.info("PRODUCTION TRAINING WITH MAPIE CONFORMAL WRAPPING")
     logger.info("=" * 60)
 
-    registry = SmilesRegistry()
+
 
     cv_report_path = OUTPUTS_DIR / "nested_cv" / "merged_report.json"
     best_params_per_subtype = {}

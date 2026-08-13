@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from sklearn.ensemble import RandomForestRegressor
 
-from src.conformal import train_conformal_model
+from src.retrain_production import train_conformal_model
 from src.predictor import _ensemble_predict
 from src.config import MAPIE_CONFIDENCE
 

@@ -37,12 +37,9 @@ USER appuser
 
 EXPOSE 8000 10000
 
-# Health check dynamically inspecting Render's $PORT (or fallback 8000)
+# Health check dynamically inspecting Render's $PORT (or fallback 8501)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import os, urllib.request; port=os.environ.get('PORT', '8000'); urllib.request.urlopen(f'http://localhost:{port}/health')" || exit 1
+    CMD curl --fail http://localhost:${PORT:-8501}/_stcore/health || exit 1
 
-# Render injects $PORT; default to 8000 for local runs
-CMD ["sh", "-c", "uvicorn src.api:app --host 0.0.0.0 --port ${PORT:-8000}"]
-
-
-
+# Render injects $PORT; default to 8501 for local runs
+CMD ["sh", "-c", "streamlit run streamlit_app.py --server.port ${PORT:-8501} --server.address 0.0.0.0"]

@@ -20,8 +20,10 @@ except ImportError:
 _MORGAN = GetMorganGenerator(radius=2, fpSize=2048)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from functools import lru_cache
 from src.config import PROCESSED_DATA_DIR
 
+@lru_cache(maxsize=10000)
 def canonicalize(smiles: str) -> Optional[str]:
     if not isinstance(smiles, str) or not smiles.strip():
         return None
@@ -303,5 +305,17 @@ def generate_sdf_block(smiles: str) -> Optional[str]:
         if embed_status == 0:
             AllChem.MMFFOptimizeMolecule(mol_3d)
         return Chem.MolToMolBlock(mol_3d)
+    except Exception:
+        return None
+
+def generate_2d_mol_block(smiles: str) -> Optional[str]:
+    """Generates a 2D conformer and returns the Mol block string."""
+    mol = mol_from_smiles(smiles)
+    if mol is None:
+        return None
+    try:
+        from rdkit.Chem import rdDepictor
+        rdDepictor.Compute2DCoords(mol)
+        return Chem.MolToMolBlock(mol)
     except Exception:
         return None

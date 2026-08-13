@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from rdkit import Chem
 
-from src.smiles_registry import SmilesRegistry
+
 from src.predictor import predict, SUBTYPES
 from src.chem_utils import canonicalize as _canonicalize
 
