@@ -1632,6 +1632,9 @@ def _bm_calib(bm):
 
 def _bm_shap(bm):
     _bm_header("03", "SHAP Feature Importance", "Mean |SHAP| feature attributions per subtype with sanity checks")
+    comb = Path("figures/fig4_treeshap.png")
+    if comb.exists():
+        st.image(str(comb), caption="Combined — top TreeSHAP feature attributions across subtypes", width="stretch")
     for s in _SUBS:
         rep = bm["shap"].get(s) or {}
         feats = (rep.get("top_features") or [])[:5]
@@ -1651,6 +1654,11 @@ def _bm_shap(bm):
                 f'<div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.3rem">{str(san.get("message", ""))[:80]}</div></div>',
                 unsafe_allow_html=True,
             )
+        bar, swarm = Path(f"outputs/shap/{s}_bar.png"), Path(f"outputs/shap/{s}_beeswarm.png")
+        if bar.exists():
+            st.image(str(bar), caption=f"{s} — mean |SHAP| feature importance", width="stretch")
+        if swarm.exists():
+            st.image(str(swarm), caption=f"{s} — SHAP beeswarm", width="stretch")
 
 
 def _bm_yrand(bm):
@@ -1683,6 +1691,11 @@ def _bm_yrand(bm):
     )
     st.plotly_chart(fig, width="stretch")
 
+    for s in _SUBS:
+        png = Path(f"outputs/y_randomization/{s}_distribution.png")
+        if png.exists():
+            st.image(str(png), caption=f"{s} — shuffled R² null distribution vs real R²", width="stretch")
+
 
 def _bm_diag(bm):
     _bm_header("05", "Training Data Diagnostics", "Scaffold diversity, pChEMBL distributions and activity cliffs per subtype")
@@ -1704,6 +1717,17 @@ def _bm_diag(bm):
     } for s in _SUBS if (d := bm["diag_per"].get(s, {}))]
     if rows:
         st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+
+    for s in _SUBS:
+        d1 = Path(f"outputs/diagnostics/{s.lower()}_pchembl_distribution.png")
+        d2 = Path(f"outputs/diagnostics/{s.lower()}_activity_cliffs_shifts.png")
+        if d1.exists():
+            st.image(str(d1), caption=f"{s} — pChEMBL distribution", width="stretch")
+        if d2.exists():
+            st.image(str(d2), caption=f"{s} — activity cliffs shifts", width="stretch")
+    comb = Path("outputs/diagnostics/combined_pchembl_distribution.png")
+    if comb.exists():
+        st.image(str(comb), caption="Combined — pChEMBL distribution", width="stretch")
 
 
 def _bm_ext(bm):
