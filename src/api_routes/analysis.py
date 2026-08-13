@@ -55,6 +55,7 @@ def _load_pipeline():
     return None
 
 
+@lru_cache(maxsize=8)
 def _load_estimator(subtype):
     mc_path = None
     for cand in (MODELS_DIR / "precise" / f"xgboost_{subtype}_production.pkl", MODELS_DIR / f"xgboost_{subtype}_production.pkl"):
