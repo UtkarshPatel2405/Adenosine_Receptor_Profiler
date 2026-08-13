@@ -210,6 +210,58 @@ header[data-testid="stHeader"] {
     color: var(--text-primary);
 }
 
+/* Hero trust & precision metric strip */
+.hero-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    margin: 1rem 0 1.25rem;
+}
+.hero-chip {
+    background: rgba(51, 63, 69, 0.8);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 0.6rem 1rem;
+    flex: 1 1 auto;
+    min-width: 120px;
+    text-align: center;
+}
+.hero-chip .chip-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+.hero-chip .chip-value {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.subtype-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.7rem;
+    margin-top: 0.6rem;
+}
+.subtype-metrics .st-chip {
+    background: rgba(56, 189, 248, 0.07);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 10px;
+    padding: 0.6rem 0.9rem;
+    text-align: center;
+}
+.subtype-metrics .st-name {
+    font-weight: 700;
+    color: #7dd3fc;
+    font-size: 0.85rem;
+}
+.subtype-metrics .st-metric {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
 /* Theory callout */
 .theory-callout {
     background: rgba(56, 189, 248, 0.06);
@@ -1281,9 +1333,23 @@ def _tab_provenance(data):
 
 with tab_single:
     st.markdown("""
-    <div style="margin-bottom:1.5rem">
-        <h1 class="page-title" style="font-size:2rem;margin:0;color:#f8fafc"><span class="material-symbols-outlined">biotech</span>Adenosine Receptor Selectivity Profiler</h1>
-        <div style="font-size:0.9rem;color:#94a3b8">Multi-model ensemble QSAR predictions across A₁, A₂A, A₂B, and A₃ with conformal uncertainty guarantees</div>
+    <div style="margin-bottom:1rem">
+        <h1 class="page-title" style="font-size:2rem;margin:0;color:#f8fafc"><span class="material-symbols-outlined">biotech</span>Adenosine Receptor Selectivity Predictor</h1>
+        <div style="font-size:0.9rem;color:#94a3b8">Rapid in silico pChEMBL profiling across A₁, A₂A, A₂B, A₃ · XGBoost + RF + LightGBM + Stacked ensemble + conformal prediction</div>
+        <div class="hero-strip">
+            <div class="hero-chip"><div class="chip-label">Overall R²</div><div class="chip-value" style="color:var(--cyan)">0.611</div></div>
+            <div class="hero-chip"><div class="chip-label">Overall MAE</div><div class="chip-value" style="color:var(--purple)">0.591</div></div>
+            <div class="hero-chip"><div class="chip-label">Compounds</div><div class="chip-value">18,452</div></div>
+            <div class="hero-chip"><div class="chip-label">Confidence</div><div class="chip-value" style="color:var(--green)">90% CIs</div></div>
+            <div class="hero-chip"><div class="chip-label">Validation</div><div class="chip-value" style="color:var(--amber)">Scaffold CV</div></div>
+            <div class="hero-chip"><div class="chip-label">Ensemble</div><div class="chip-value">3-Model</div></div>
+        </div>
+        <div class="subtype-metrics">
+            <div class="st-chip"><div class="st-name">A₁</div><div class="st-metric">R² 0.406 · MAE 0.654</div></div>
+            <div class="st-chip"><div class="st-name">A₂A</div><div class="st-metric">R² 0.692 · MAE 0.541</div></div>
+            <div class="st-chip"><div class="st-name">A₂B</div><div class="st-metric">R² 0.673 · MAE 0.562</div></div>
+            <div class="st-chip"><div class="st-name">A₃</div><div class="st-metric">R² 0.599 · MAE 0.610</div></div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
